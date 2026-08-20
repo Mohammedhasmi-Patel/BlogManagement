@@ -11,11 +11,12 @@ namespace BlogManagement.Extension
         {
             service.AddControllers();
             string databaseUrl = configuration.GetConnectionString("DefaultConnection")!;
+
+            service.AddSwaggerGen();
             service.AddDbContext<AppDbContext>(options =>
             {
                 options.UseSqlServer(databaseUrl);
             });
-
             service.AddIdentity<AppUser, AppRole>()
                     .AddEntityFrameworkStores<AppDbContext>()
                     .AddDefaultTokenProviders();
