@@ -1,4 +1,4 @@
-﻿namespace BlogManagement.Models
+namespace BlogManagement.Models
 {
     public class Blog
     {
@@ -26,6 +26,15 @@
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+        // Navigation properties
+        public AppUser Author { get; set; } = null!;
 
+        public ICollection<BlogHasCategory> BlogCategories { get; set; } = new List<BlogHasCategory>();
+
+        public ICollection<Comment> Comments { get; set; } = new List<Comment>();
+
+        public ICollection<Like> Likes { get; set; } = new List<Like>();
+
+        public ICollection<Bookmark> Bookmarks { get; set; } = new List<Bookmark>();
     }
 }

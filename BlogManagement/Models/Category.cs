@@ -1,4 +1,4 @@
-﻿namespace BlogManagement.Models
+namespace BlogManagement.Models
 {
     public class Category : BaseEntity
     {
@@ -13,6 +13,10 @@
         public string? Icon { get; set; }
 
         public Guid CreatedBy { get; set; }
+        
+        // Navigation properties
+        public AppUser Creator { get; set; } = null!;
 
+        public ICollection<BlogHasCategory> BlogCategories { get; set; } = new List<BlogHasCategory>();
     }
 }

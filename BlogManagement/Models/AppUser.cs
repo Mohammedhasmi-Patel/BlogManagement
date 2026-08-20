@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
+using System.Collections.Generic;
 
 namespace BlogManagement.Models
 {
@@ -12,5 +13,19 @@ namespace BlogManagement.Models
         public DateTime? UpdatedAt { get; set; }
         public DateTime? DeletedAt { get; set; }
 
+        // Navigation properties
+        public ICollection<Blog> Blogs { get; set; } = new List<Blog>();
+
+        public ICollection<Category> Categories { get; set; } = new List<Category>();
+
+        public ICollection<Bookmark> Bookmarks { get; set; } = new List<Bookmark>();
+
+        public ICollection<Like> Likes { get; set; } = new List<Like>();
+
+        public ICollection<Comment> Comments { get; set; } = new List<Comment>();
+
+        public ICollection<UserFollow> Followers { get; set; } = new List<UserFollow>();
+
+        public ICollection<UserFollow> Following { get; set; } = new List<UserFollow>();
     }
 }
