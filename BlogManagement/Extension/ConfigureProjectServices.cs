@@ -1,5 +1,6 @@
-﻿using BlogManagement.Database;
+using BlogManagement.Database;
 using BlogManagement.Models;
+using FluentValidation;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -20,6 +21,9 @@ namespace BlogManagement.Extension
             service.AddIdentity<AppUser, AppRole>()
                     .AddEntityFrameworkStores<AppDbContext>()
                     .AddDefaultTokenProviders();
+
+            service.AddValidatorsFromAssembly(typeof(ConfigureProjectServices).Assembly);
+
             return service;
         }
     }

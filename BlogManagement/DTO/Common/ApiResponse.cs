@@ -1,4 +1,5 @@
-namespace BlogManagement.DTO;
+using BlogManagement.DTO.Common;
+namespace BlogManagement.DTO.Common;
 
 public class ApiResponse<T>
 {

@@ -1,4 +1,4 @@
-namespace BlogManagement.DTO;
+namespace BlogManagement.DTO.Common;
 
 public class ErrorResponse
 {
