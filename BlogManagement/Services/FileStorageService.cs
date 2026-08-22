@@ -68,6 +68,30 @@ public class FileStorageService : IFileStorageService
     }
     public Task DeleteAsync(string filePath, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            return Task.CompletedTask;
+        }
+
+        try
+        {
+            string fullPath = filePath;
+            if (!Path.IsPathRooted(filePath) || filePath.StartsWith('/') || filePath.StartsWith('\\'))
+            {
+                var relativePath = filePath.TrimStart('/', '\\').Replace('/', Path.DirectorySeparatorChar);
+                fullPath = Path.Combine(_env.WebRootPath, relativePath);
+            }
+
+            if (File.Exists(fullPath))
+            {
+                File.Delete(fullPath);
+            }
+        }
+        catch
+        {
+            // Ignore failure during cleanup to avoid suppressing primary exceptions
+        }
+
+        return Task.CompletedTask;
     }
 }

@@ -24,28 +24,40 @@ public class AuthService(AppDbContext context,UserManager<AppUser> userManager,I
 
     public async Task<ApiResponse<RegisterUserResponseDTO>> RegisterUserAsync(RegisterUserRequestDTO requestDTO)
     {
+        var existingUser = await _userManager.FindByEmailAsync(requestDTO.Email);
+        if (existingUser != null)
+        {
+            throw new ConflictException("User with this email already exists.");
+        }
+
+        if (!System.Enum.TryParse<UserRoleEnum>(requestDTO.Role, ignoreCase: true, out var roleEnum) || roleEnum == UserRoleEnum.Admin)
+        {
+            throw new BadRequestException("Invalid user role.");
+        }
+
+        string role = roleEnum.ToString();
+        string? uploadedFilePath = null;
+
         await using var transaction = await _context.Database.BeginTransactionAsync();
         try
         {
-            var existingUser = await _userManager.FindByEmailAsync(requestDTO.Email);
-            if (existingUser != null)
-            {
-                throw new ConflictException("User with this email already exists.");
-            }
-
-            var role = requestDTO.Role switch
-            {
-                nameof(UserRoleEnum.Author) => nameof(UserRoleEnum.Author),
-                nameof(UserRoleEnum.User) => nameof(UserRoleEnum.User),
-                _ => throw new BadRequestException("Invalid user role.")
-            };
-
             var user = requestDTO.Adapt<AppUser>();
             user.UserName = requestDTO.Email;
+
+            if (requestDTO.Avatar != null)
+            {
+                var uploadResult = await _fileService.UploadAsync(requestDTO.Avatar, "users", isFileRequired: false);
+                if (uploadResult != null)
+                {
+                    user.Avatar = uploadResult.FileUrl;
+                    uploadedFilePath = uploadResult.FilePath;
+                }
+            }
+
             var result = await _userManager.CreateAsync(user, requestDTO.Password);
             if (!result.Succeeded)
             {
-                string firstError = result.Errors.Select(e => e.Description).FirstOrDefault() ?? "Failed to create user";
+                string firstError = result.Errors.Select(e => e.Description).FirstOrDefault() ?? "Failed to create user.";
                 throw new BadRequestException(firstError);
             }
 
@@ -56,60 +68,45 @@ public class AuthService(AppDbContext context,UserManager<AppUser> userManager,I
                 throw new BadRequestException(firstMessage);
             }
 
-            if (requestDTO.Avatar != null)
-            {
-                var uploadResult = await _fileService.UploadAsync(requestDTO.Avatar, "users", true);
-                user.Avatar = uploadResult?.FileUrl;
-            }
-
-            var updateUserResult = await _userManager.UpdateAsync(user);
-            if (!updateUserResult.Succeeded)
-            {
-                var firstMessage = updateUserResult.Errors.
-                                            Select(e => e.Description)
-                                            .FirstOrDefault() ?? "Failed to update user avatar.";
-                throw new BadRequestException(firstMessage);
-            }
+            await transaction.CommitAsync();
 
             var responseData = user.Adapt<RegisterUserResponseDTO>();
             responseData.Token = await _tokenService.GenerateJwtTokenAsync(user);
-            responseData.Avatar = await user.GetUserProfileUrl(_options);
-            await transaction.CommitAsync();
+            responseData.Avatar = user.GetUserProfileUrl(_options);
 
             return ApiResponse<RegisterUserResponseDTO>.SuccessResponse(responseData, 201, "User registered successfully.");
-        }catch(Exception ex)
+        }
+        catch
         {
             await transaction.RollbackAsync();
+
+            if (!string.IsNullOrEmpty(uploadedFilePath))
+            {
+                await _fileService.DeleteAsync(uploadedFilePath);
+            }
+
             throw;
         }
-        
     }
 
     public async Task<ApiResponse<LoginResponseDTO>> LoginUserAsync(LoginRequestDTO loginRequestDTO)
     {
-        try
+        var user = await _userManager.FindByEmailAsync(loginRequestDTO.Email);
+        if (user == null || user.DeletedAt != null)
         {
-            var user = await _userManager.FindByEmailAsync(loginRequestDTO.Email);
-            if (user == null)
-            {
-                throw new UnauthorizedException("Invalid email or password.");
-            }
-
-            var isPasswordValid = await _userManager.CheckPasswordAsync(user, loginRequestDTO.Password);
-            if (!isPasswordValid)
-            {
-                throw new UnauthorizedException("Invalid credentials.");
-            }
-
-            var responseData = user.Adapt<LoginResponseDTO>();
-            responseData.Token = await _tokenService.GenerateJwtTokenAsync(user);
-            responseData.Avatar = await user.GetUserProfileUrl(_options);
-
-            return ApiResponse<LoginResponseDTO>.SuccessResponse(responseData, 200, "User logged in successfully.");
-        }catch(Exception ex)
-        {
-            throw;
+            throw new UnauthorizedException("Invalid email or password.");
         }
-        
+
+        var isPasswordValid = await _userManager.CheckPasswordAsync(user, loginRequestDTO.Password);
+        if (!isPasswordValid)
+        {
+            throw new UnauthorizedException("Invalid email or password.");
+        }
+
+        var responseData = user.Adapt<LoginResponseDTO>();
+        responseData.Token = await _tokenService.GenerateJwtTokenAsync(user);
+        responseData.Avatar = user.GetUserProfileUrl(_options);
+
+        return ApiResponse<LoginResponseDTO>.SuccessResponse(responseData, 200, "User logged in successfully.");
     }
 }

@@ -1,4 +1,4 @@
-﻿using BlogManagement.Configurations;
+using BlogManagement.Configurations;
 using BlogManagement.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
@@ -7,16 +7,22 @@ namespace BlogManagement.Extension
 {
     public static class AppUserExtension
     {
-        public static async Task<string> GetUserRole(this AppUser user,UserManager<AppUser> userManager)
+        public static async Task<string> GetUserRole(this AppUser user, UserManager<AppUser> userManager)
         {
-            string role = (await userManager.GetRolesAsync(user)).FirstOrDefault()!;
-            return role;
+            var roles = await userManager.GetRolesAsync(user);
+            return roles.FirstOrDefault() ?? "User";
         }
 
-        public static async Task<string?> GetUserProfileUrl(this AppUser user,IOptions<AppSettings> setting)
+        public static string? GetUserProfileUrl(this AppUser user, IOptions<AppSettings> setting)
         {
-            AppSettings settings = setting.Value;
-            return user.Avatar == null ? null : $"{settings.BaseUrl}{user.Avatar}";
+            if (string.IsNullOrWhiteSpace(user.Avatar))
+            {
+                return null;
+            }
+
+            var baseUrl = setting.Value.BaseUrl?.TrimEnd('/') ?? string.Empty;
+            var avatarPath = user.Avatar.StartsWith('/') ? user.Avatar : $"/{user.Avatar}";
+            return $"{baseUrl}{avatarPath}";
         }
     }
 }

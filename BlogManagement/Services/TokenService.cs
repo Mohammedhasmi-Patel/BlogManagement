@@ -1,4 +1,4 @@
-﻿using BlogManagement.Models;
+using BlogManagement.Models;
 using BlogManagement.ServiceContracts;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -28,11 +28,11 @@ namespace BlogManagement.Services
             string role = await user.GetUserRole(_userManager);
             Claim[] claims = new Claim[]
             {
-                new Claim(JwtRegisteredClaimNames.Sub,user.Id.ToString()),
-                new Claim(JwtRegisteredClaimNames.Jti,Guid.NewGuid().ToString()),
-                new Claim(JwtRegisteredClaimNames.Email,user.Email!),
-                new Claim(ClaimTypes.Name,user.UserName),
-                new Claim(ClaimTypes.Role,role)
+                new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                new Claim(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
+                new Claim(ClaimTypes.Name, user.UserName ?? user.Email ?? string.Empty),
+                new Claim(ClaimTypes.Role, role)
             };
 
             var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtConfig.SecretKey));

@@ -1,5 +1,4 @@
 using System.Text.Json;
-using BlogManagement.DTO;
 using BlogManagement.Exceptions;
 using BlogManagement.DTO.Common;
 
@@ -22,11 +21,23 @@ public class GlobalExceptionMiddleware
         }
         catch (AppException ex)
         {
-            await HandleExceptionAsync(context, ex.StatusCode, ex.Message);
+            int statusCode = ex switch
+            {
+                BadRequestException => StatusCodes.Status400BadRequest,
+                UnauthorizedException => StatusCodes.Status401Unauthorized,
+                ForbiddenException => StatusCodes.Status403Forbidden,
+                NotFoundException => StatusCodes.Status404NotFound,
+                ConflictException => StatusCodes.Status409Conflict,
+                UnprocessableEntityException => StatusCodes.Status422UnprocessableEntity,
+                InternalServerException => StatusCodes.Status500InternalServerError,
+                _ => StatusCodes.Status500InternalServerError
+            };
+
+            await HandleExceptionAsync(context, statusCode, ex.Message);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            await HandleExceptionAsync(context, 500, "An unexpected error occurred.");
+            await HandleExceptionAsync(context, StatusCodes.Status500InternalServerError, "An unexpected error occurred.");
         }
     }
 

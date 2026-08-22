@@ -2,7 +2,7 @@ namespace BlogManagement.Exceptions;
 
 public class ForbiddenException : AppException
 {
-    public ForbiddenException(string message) : base(message, 403)
+    public ForbiddenException(string message) : base(message)
     {
     }
 }

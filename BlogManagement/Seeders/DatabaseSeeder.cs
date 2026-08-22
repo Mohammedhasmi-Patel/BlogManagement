@@ -1,5 +1,4 @@
-﻿using BlogManagement.Enum;
-using BlogManagement.Models;
+﻿using BlogManagement.Models;
 using Microsoft.AspNetCore.Identity;
 
 namespace BlogManagement.Seeders
