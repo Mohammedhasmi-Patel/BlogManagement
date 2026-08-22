@@ -1,22 +1,21 @@
-namespace BlogManagement.Models
+namespace BlogManagement.Models;
+
+public class Category : BaseEntity
 {
-    public class Category : BaseEntity
-    {
-        public Guid Id { get; set; }
+    public Guid Id { get; set; }
 
-        public string Name { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
 
-        public string Slug { get; set; } = string.Empty;
+    public string Slug { get; set; } = string.Empty;
 
-        public string? Description { get; set; }
+    public string? Description { get; set; }
 
-        public string? Icon { get; set; }
+    public string? Icon { get; set; }
 
-        public Guid CreatedBy { get; set; }
-        
-        // Navigation properties
-        public AppUser Creator { get; set; } = null!;
+    public Guid CreatedBy { get; set; }
 
-        public ICollection<BlogHasCategory> BlogCategories { get; set; } = new List<BlogHasCategory>();
-    }
+    // Navigation properties
+    public AppUser Creator { get; set; } = null!;
+
+    public ICollection<BlogHasCategory> BlogCategories { get; set; } = [];
 }

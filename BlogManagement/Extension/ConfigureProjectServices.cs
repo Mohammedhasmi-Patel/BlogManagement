@@ -1,3 +1,4 @@
+using System.Text;
 using BlogManagement.Configurations;
 using BlogManagement.Database;
 using BlogManagement.Models;
@@ -9,7 +10,6 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using System.Text;
 
 namespace BlogManagement.Extension
 {
@@ -56,6 +56,7 @@ namespace BlogManagement.Extension
             service.AddScoped<IAuthService, AuthService>();
             service.AddScoped<IFileStorageService,FileStorageService>();
             service.AddScoped<ITokenService, TokenService>();
+            service.AddScoped<ICategoryService,CategoryService>();
 
 
             return service;

@@ -14,11 +14,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-// await DatabaseSeeder.SeedAsync(app.Services);
-
 app.UseGlobalExceptionHandler();
 
 app.UseHttpsRedirection();
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
