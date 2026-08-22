@@ -24,46 +24,58 @@ public class CategoryService : ICategoryService
         _userManager = userManager;
         _storageService = storageService;
     }
-    public async Task<ApiResponse<CategoryResponseDTO>> CreateAsync(CreateCategoryRequestDTO requestDTO,string email,CancellationToken ct)
+    public async Task<ApiResponse<CategoryResponseDTO>> CreateAsync(CreateCategoryRequestDTO requestDTO, string email, CancellationToken ct)
     {
-        // throw new NotImplementedException();
         await using var transaction = await _context.Database.BeginTransactionAsync(ct);
+        string? fileUrl = null;
 
         try
         {
             AppUser? appUser = await _userManager.FindByEmailAsync(email);
-             string? fileUrl = null;
             if (appUser is null)
             {
-                throw new UnauthorizedAccessException("Unauthorized user.");
-            }
-            var categoryNameFromDb = await _context.Categories.Where(c => c.CreatedBy == appUser.Id)
-                                                                    .AnyAsync(c => string.Equals(c.Name, requestDTO.Name, StringComparison.OrdinalIgnoreCase), ct);
-            if (categoryNameFromDb)
-            {
-                throw new BadRequestException("Category name exist");
+                throw new UnauthorizedException("Unauthorized user.");
             }
 
-            if (requestDTO.Icon?.Length > 0)
+            string trimmedName = (requestDTO.Name ?? string.Empty).Trim();
+            string normalizedName = trimmedName.ToLower();
+
+            var categoryExists = await _context.Categories
+                .Where(c => c.CreatedBy == appUser.Id)
+                .AnyAsync(c => c.Name.ToLower() == normalizedName, ct);
+
+            if (categoryExists)
             {
-                var fileresponse = await _storageService.UploadAsync(requestDTO.Icon, "categories", true, ct);
-                fileUrl = fileresponse?.FileUrl;
+                throw new ConflictException($"Category '{trimmedName}' already exists.");
+            }
+
+            if (requestDTO.Icon != null && requestDTO.Icon.Length > 0)
+            {
+                var fileResponse = await _storageService.UploadAsync(requestDTO.Icon, "categories", isFileRequired: false, ct);
+                fileUrl = fileResponse?.FileUrl;
             }
 
             Category category = requestDTO.Adapt<Category>();
-            category.Slug = await category.GenerateUniqueSlug(_context);
             category.Icon = fileUrl;
             category.CreatedBy = appUser.Id;
-            var result = await _context.Categories.AddAsync(category, ct) ?? throw new BadRequestException("Something went wrong while adding the category.");
+            category.Slug = await category.GenerateUniqueSlug(_context, ct);
+
+            await _context.Categories.AddAsync(category, ct);
             await _context.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
 
             var responseData = category.Adapt<CategoryResponseDTO>();
-            return ApiResponse<CategoryResponseDTO>.SuccessResponse(responseData,201,"Category created successfully.");
+            return ApiResponse<CategoryResponseDTO>.SuccessResponse(responseData, 201, "Category created successfully.");
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             await transaction.RollbackAsync(ct);
+
+            if (!string.IsNullOrWhiteSpace(fileUrl))
+            {
+                await _storageService.DeleteAsync(fileUrl, CancellationToken.None);
+            }
+
             throw;
         }
     }

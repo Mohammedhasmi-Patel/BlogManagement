@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using BlogManagement.Database;
 using BlogManagement.Models;
 using Microsoft.EntityFrameworkCore;
@@ -6,22 +7,41 @@ namespace BlogManagement.Extension;
 
 public static class CategoryExtension
 {
-    public async static Task<string> GenerateUniqueSlug(this Category category,AppDbContext context)
+    public static async Task<string> GenerateUniqueSlug(this Category category, AppDbContext context, CancellationToken ct = default)
     {
-        string baseSlug = category.Name
-                .ToLowerInvariant()
-                .Trim()
-                .Replace(" ", "-");
-        string slug = baseSlug;
-        int count = 1;
+        string raw = (category.Name ?? string.Empty).ToLowerInvariant().Trim();
 
-        while (await context.Categories.AnyAsync(c => c.Slug == slug))
+        // Remove invalid characters (keep lowercase letters, digits, spaces, hyphens)
+        string cleaned = Regex.Replace(raw, @"[^a-z0-9\s-]", string.Empty);
+
+        // Replace consecutive whitespace/hyphens with a single hyphen
+        string baseSlug = Regex.Replace(cleaned, @"[\s-]+", "-").Trim('-');
+
+        if (string.IsNullOrWhiteSpace(baseSlug))
         {
-             slug = $"{baseSlug}-{count}";
-             count++;
+            baseSlug = "category";
         }
 
-        return slug;
-    }
+        var existingSlugs = await context.Categories
+            .Where(c => c.Slug == baseSlug || c.Slug.StartsWith(baseSlug + "-"))
+            .Select(c => c.Slug)
+            .ToListAsync(ct);
 
+        var existingSet = new HashSet<string>(existingSlugs, StringComparer.OrdinalIgnoreCase);
+
+        if (!existingSet.Contains(baseSlug))
+        {
+            return baseSlug;
+        }
+
+        int count = 1;
+        string candidate = $"{baseSlug}-{count}";
+        while (existingSet.Contains(candidate))
+        {
+            count++;
+            candidate = $"{baseSlug}-{count}";
+        }
+
+        return candidate;
+    }
 }

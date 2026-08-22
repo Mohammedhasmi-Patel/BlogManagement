@@ -8,25 +8,30 @@ public class CreateCategoryRequestValidator : AbstractValidator<CreateCategoryRe
     public CreateCategoryRequestValidator()
     {
         RuleFor(ct => ct.Name)
-                .NotEmpty()
-                .WithMessage("Name is required.")
-                .MinimumLength(3)
-                .WithMessage("Name must be at least 3 characters long.")
-                .MaximumLength(55)
-                .WithMessage("Name must be at least 3 characters long.");
+            .NotEmpty()
+            .WithMessage("Category name is required.")
+            .MinimumLength(3)
+            .WithMessage("Category name must be at least 3 characters long.")
+            .MaximumLength(55)
+            .WithMessage("Category name must not exceed 55 characters.");
 
-        RuleFor(ct => ct.Description)
-                .NotEmpty()
-                .WithMessage("Name is required.")
+        When(ct => !string.IsNullOrWhiteSpace(ct.Description), () =>
+        {
+            RuleFor(ct => ct.Description)
                 .MinimumLength(10)
-                .WithMessage("Name must be at least 10 characters long.")
+                .WithMessage("Description must be at least 10 characters long.")
                 .MaximumLength(255)
-                .WithMessage("Name must be at least 255 characters long.");
+                .WithMessage("Description must not exceed 255 characters.");
+        });
 
-        RuleFor(x => x.Icon)
-                .Must(file => file == null || new[] { ".jpg", ".jpeg", ".png" }
-                .Contains(Path.GetExtension(file.FileName), StringComparer.OrdinalIgnoreCase))
-                .WithMessage("Only .jpg, .jpeg, and .png files are allowed.");
-
+        When(x => x.Icon != null, () =>
+        {
+            RuleFor(x => x.Icon!)
+                .Must(file => file.Length <= 5 * 1024 * 1024)
+                .WithMessage("Icon file size must not exceed 5MB.")
+                .Must(file => new[] { ".jpg", ".jpeg", ".png", ".webp", ".svg" }
+                    .Contains(Path.GetExtension(file.FileName), StringComparer.OrdinalIgnoreCase))
+                .WithMessage("Only .jpg, .jpeg, .png, .webp, and .svg files are allowed.");
+        });
     }
 }
