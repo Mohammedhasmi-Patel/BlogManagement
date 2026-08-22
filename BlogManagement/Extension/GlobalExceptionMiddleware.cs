@@ -8,12 +8,10 @@ namespace BlogManagement.Extension;
 public class GlobalExceptionMiddleware
 {
     private readonly RequestDelegate _next;
-    private readonly ILogger<GlobalExceptionMiddleware> _logger;
 
-    public GlobalExceptionMiddleware(RequestDelegate next, ILogger<GlobalExceptionMiddleware> logger)
+    public GlobalExceptionMiddleware(RequestDelegate next)
     {
         _next = next;
-        _logger = logger;
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -24,12 +22,10 @@ public class GlobalExceptionMiddleware
         }
         catch (AppException ex)
         {
-            _logger.LogWarning(ex, "AppException: {Message}", ex.Message);
             await HandleExceptionAsync(context, ex.StatusCode, ex.Message);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unhandled Exception: {Message}", ex.Message);
             await HandleExceptionAsync(context, 500, "An unexpected error occurred.");
         }
     }

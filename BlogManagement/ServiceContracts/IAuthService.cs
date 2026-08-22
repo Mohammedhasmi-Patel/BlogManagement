@@ -5,6 +5,6 @@ namespace BlogManagement.ServiceContracts;
 
 public interface IAuthService
 {
-    public Task<ApiResponse<RegisterUserResponseDTO>> RegisterUserAsync(RegisterUserRequestDTO registerUserRequestDTO);
-    
+    Task<ApiResponse<RegisterUserResponseDTO>> RegisterUserAsync(RegisterUserRequestDTO registerUserRequestDTO);
+    Task<ApiResponse<LoginResponseDTO>> LoginUserAsync(LoginRequestDTO loginRequestDTO);
 }
