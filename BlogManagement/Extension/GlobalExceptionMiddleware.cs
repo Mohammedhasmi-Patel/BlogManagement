@@ -1,6 +1,6 @@
 using System.Text.Json;
-using BlogManagement.Exceptions;
 using BlogManagement.DTO.Common;
+using BlogManagement.Exceptions;
 
 namespace BlogManagement.Extension;
 
@@ -35,9 +35,9 @@ public class GlobalExceptionMiddleware
 
             await HandleExceptionAsync(context, statusCode, ex.Message);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            await HandleExceptionAsync(context, StatusCodes.Status500InternalServerError, "An unexpected error occurred.");
+            await HandleExceptionAsync(context, StatusCodes.Status500InternalServerError, ex.Message);
         }
     }
 

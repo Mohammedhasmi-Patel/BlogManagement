@@ -14,6 +14,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseGlobalExceptionHandler();
 
+app.UseCors("FrontendCors");
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();

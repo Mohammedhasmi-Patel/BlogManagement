@@ -11,11 +11,13 @@ public class FileStorageService : IFileStorageService
 
     private readonly IWebHostEnvironment _env;
     private readonly FileUploadSettings _fileSetting;
+    private readonly AppSettings _setting;
 
-    public FileStorageService(IWebHostEnvironment env,IOptions<FileUploadSettings> options)
+    public FileStorageService(IWebHostEnvironment env, IOptions<FileUploadSettings> options, IOptions<AppSettings> _options)
     {
         _env = env;
         _fileSetting = options.Value;
+        _setting = _options.Value;
     }
 
     public async Task<FileUploadResultResponseDTO?> UploadAsync(IFormFile? file, string folder, bool isFileRequired = false, CancellationToken cancellationToken = default)
@@ -45,7 +47,7 @@ public class FileStorageService : IFileStorageService
         string uploadFolder = Path.Combine(_env.WebRootPath, "uploads", folder);
         string uniqueFilename = Guid.NewGuid().ToString() + Path.GetExtension(file.FileName);
 
-        if(!Directory.Exists(uploadFolder))
+        if (!Directory.Exists(uploadFolder))
         {
             Directory.CreateDirectory(uploadFolder);
         }
@@ -94,4 +96,16 @@ public class FileStorageService : IFileStorageService
 
         return Task.CompletedTask;
     }
+
+    public string? GetSignedUrlAsync(string fileUrl, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(fileUrl))
+        {
+            return null;
+        }
+
+        string baseUrl = _setting.BaseUrl;
+        return $"{baseUrl}{fileUrl}";
+    }
+
 }

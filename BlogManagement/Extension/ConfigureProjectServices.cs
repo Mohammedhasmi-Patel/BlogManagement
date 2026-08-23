@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi;
 
 namespace BlogManagement.Extension;
 
@@ -24,10 +25,39 @@ public static class ConfigureProjectServices
         service.Configure<AppSettings>(configuration.GetSection("AppSettings"));
 
         JwtConfiguration jwtConfiguration = configuration.GetSection("JwtConfiguration").Get<JwtConfiguration>()!;
-        service.AddControllers();
+        List<string> allowedOrigins = configuration.GetSection("AllowedOrigins").Get<List<string>>()!;
 
+        service.AddCors(options =>
+        {
+            options.AddPolicy("FrontendCors", policy => policy
+            .WithOrigins(allowedOrigins.ToArray()!)
+            .AllowAnyMethod()
+            .AllowAnyHeader());
+        });
+
+        service.AddControllers();
         string databaseUrl = configuration.GetConnectionString("DefaultConnection")!;
-        service.AddSwaggerGen();
+        service.AddSwaggerGen(options =>
+        {
+            options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+            {
+                In = ParameterLocation.Header,
+                Description = "Please enter a valid JWT token",
+                Name = "Authorization",
+                Type = SecuritySchemeType.Http,
+                BearerFormat = "JWT",
+                Scheme = "Bearer"
+            });
+
+            options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+            {
+                {
+                    new OpenApiSecuritySchemeReference("Bearer", document),
+                    new List<string>()
+                }
+            });
+        });
+
         service.AddDbContext<AppDbContext>(options => options.UseSqlServer(databaseUrl));
 
         service.AddIdentityCore<AppUser>()

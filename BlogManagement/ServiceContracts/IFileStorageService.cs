@@ -8,4 +8,5 @@ public interface IFileStorageService
 
     Task DeleteAsync(string filePath, CancellationToken cancellationToken = default);
 
+    string? GetSignedUrlAsync(string fileUrl, CancellationToken cancellationToken = default);
 }

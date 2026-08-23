@@ -15,10 +15,10 @@ public class CategoryService(AppDbContext context, UserManager<AppUser> userMana
 {
     private readonly AppDbContext _context = context;
     private readonly UserManager<AppUser> _userManager = userManager;
-    private readonly  IFileStorageService _storageService = storageService;
+    private readonly IFileStorageService _storageService = storageService;
 
 
-    public async Task<ApiResponse<CategoryResponseDTO>> CreateAsync(CreateCategoryRequestDTO requestDTO,string email,CancellationToken ct)
+    public async Task<ApiResponse<CategoryResponseDTO>> CreateAsync(CreateCategoryRequestDTO requestDTO, string email, CancellationToken ct)
     {
         // throw new NotImplementedException();
         await using var transaction = await _context.Database.BeginTransactionAsync(ct);
@@ -26,13 +26,12 @@ public class CategoryService(AppDbContext context, UserManager<AppUser> userMana
         try
         {
             AppUser? appUser = await _userManager.FindByEmailAsync(email);
-             string? fileUrl = null;
+            string? fileUrl = null;
             if (appUser is null)
             {
                 throw new UnauthorizedAccessException("Unauthorized user.");
             }
-            var categoryNameFromDb = await _context.Categories.Where(c => c.CreatedBy == appUser.Id)
-                                                                    .AnyAsync(c => string.Equals(c.Name, requestDTO.Name, StringComparison.OrdinalIgnoreCase), ct);
+            var categoryNameFromDb = await _context.Categories.AnyAsync(c => c.CreatedBy == appUser.Id && c.Name.ToLower() == requestDTO.Name.ToLower(), ct);
             if (categoryNameFromDb)
             {
                 throw new BadRequestException("Category name exist");
@@ -53,7 +52,7 @@ public class CategoryService(AppDbContext context, UserManager<AppUser> userMana
             await transaction.CommitAsync(ct);
 
             var responseData = category.Adapt<CategoryResponseDTO>();
-            return ApiResponse<CategoryResponseDTO>.SuccessResponse(responseData,201,"Category created successfully.");
+            return ApiResponse<CategoryResponseDTO>.SuccessResponse(responseData, 201, "Category created successfully.");
         }
         catch
         {
@@ -63,10 +62,10 @@ public class CategoryService(AppDbContext context, UserManager<AppUser> userMana
         }
     }
 
-    public async Task<ApiResponse<PaginationResult<CategoryResponseDTO>>> GetAllAsync(GetCategoriesRequestDTO requestDTO,string email, CancellationToken ct)
+    public async Task<ApiResponse<PaginationResult<CategoryResponseDTO>>> GetAllAsync(GetCategoriesRequestDTO requestDTO, string email, CancellationToken ct)
     {
-        AppUser? appUser = await _userManager.FindByEmailAsync(email) ?? throw new UnauthorizedAccessException("Unauthorized user.");;
-    
+        AppUser? appUser = await _userManager.FindByEmailAsync(email) ?? throw new UnauthorizedAccessException("Unauthorized user."); ;
+
         var categoryQuery = _context.Categories
                                     .AsNoTracking()
                                     .Where(c => c.DeletedAt == null && c.CreatedBy == appUser.Id);
@@ -102,6 +101,14 @@ public class CategoryService(AppDbContext context, UserManager<AppUser> userMana
             .ProjectToType<CategoryResponseDTO>()
             .ToListAsync(ct);
 
+        foreach (var category in categoriesListingDTO)
+        {
+            if (category.Icon != null)
+            {
+                var fileResponse =  _storageService.GetSignedUrlAsync(category.Icon, ct);
+                category.Icon = fileResponse;
+            }
+        }
         var responseDTO = new PaginationResult<CategoryResponseDTO>(categoriesListingDTO, totalCount, requestDTO.PageNumber, requestDTO.PageSize);
         return ApiResponse<PaginationResult<CategoryResponseDTO>>.SuccessResponse(responseDTO, 200, "Categories list fetched successfully.");
     }
