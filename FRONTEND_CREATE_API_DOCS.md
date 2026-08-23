@@ -50,6 +50,8 @@ export interface ApiResponse<T> {
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Create Category** | `POST` | `/api/categories` | `multipart/form-data` | `Bearer <JWT_TOKEN>` | `Author` |
 | **Register User (Create Account)** | `POST` | `/api/auth/register` | `multipart/form-data` | Public | None |
+| **Upload Blog Content Image** | `POST` | `/api/blogs/upload-image` | `multipart/form-data` | `Bearer <JWT_TOKEN>` | `Author` |
+| **Create Blog** | `POST` | `/api/blogs` | `multipart/form-data` | `Bearer <JWT_TOKEN>` | `Author` |
 
 ---
 
@@ -210,7 +212,128 @@ Send parameters as **`multipart/form-data`**:
 
 ---
 
-## 5. TypeScript Interfaces
+## 5. Upload Blog Content Image API (WYSIWYG / Rich-Text Editor)
+
+Uploads an inline image inserted by the author into the rich-text editor (e.g. TipTap, Quill, Markdown). Returns the persistent relative and full image URLs for immediate rendering in the editor content.
+
+- **Method**: `POST`
+- **Route**: `/api/blogs/upload-image`
+- **Content-Type**: `multipart/form-data`
+- **Authentication**: `Bearer <JWT_TOKEN>` (Must belong to a user with role `Author`)
+
+### 5.1 Request Payload
+
+| Field | Type | Required | Validations / Constraints | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `file` | `File` (binary) | **Yes** | Max size **5MB**. Allowed extensions: `.jpg`, `.jpeg`, `.png`, `.webp`, `.svg`. | Inline image file |
+
+### 5.2 Response Payload (`UploadBlogImageResponseDTO`)
+
+#### `200 OK` — Success Response
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "Image uploaded successfully.",
+  "data": {
+    "fileUrl": "/uploads/blogs/7b5879ea-0bd4-49c0-8da1-3c58ecb1ff19.png",
+    "fullUrl": "http://localhost:5027/uploads/blogs/7b5879ea-0bd4-49c0-8da1-3c58ecb1ff19.png",
+    "fileName": "7b5879ea-0bd4-49c0-8da1-3c58ecb1ff19.png",
+    "originalFileName": "system-architecture.png",
+    "fileSize": 128450
+  }
+}
+```
+
+---
+
+## 6. Create Blog API
+
+Creates a new blog post. Automatically computes reading time, generates an SEO slug from title, stores the cover image, and links all inline images referenced in `content` into `BlogHasMedia`.
+
+- **Method**: `POST`
+- **Route**: `/api/blogs`
+- **Content-Type**: `multipart/form-data`
+- **Authentication**: `Bearer <JWT_TOKEN>` (Must belong to a user with role `Author`)
+
+### 6.1 Request Payload (`CreateBlogRequestDTO`)
+
+Send parameters as **`multipart/form-data`**:
+
+| Field | Type | Required | Validations / Constraints | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `title` | `string` | **Yes** | Min 3, Max 255 chars. Unique per author. | Post title |
+| `content` | `string` | **Yes** | Min 10 chars. HTML or Markdown with inline `<img src="..." />`. | Full blog content |
+| `summary` | `string` | No | Max 500 chars. Auto-generated from content if omitted. | Brief summary / excerpt |
+| `status` | `string` | **Yes** | `"draft"` or `"published"` (default: `"draft"`). | Publication status |
+| `seoJson` | `string` | No | Optional JSON string containing SEO meta keys. | SEO metadata |
+| `coverImage` | `File` (binary) | No | Optional. Max 5MB. (.jpg, .jpeg, .png, .webp, .svg). | Main banner/thumbnail image |
+| `categoryIds` | `string[]` | No | Array of Category UUIDs (e.g. append each `categoryIds`). | Associated category IDs |
+
+### 6.2 Response Payload (`BlogResponseDTO`)
+
+#### `201 Created` — Success Response
+```json
+{
+  "success": true,
+  "statusCode": 201,
+  "message": "Blog created successfully.",
+  "data": {
+    "id": "e93d93cb-3c66-419b-8e12-32a2656fe2b2",
+    "title": "Getting Started with ASP.NET Core & Next.js",
+    "slug": "getting-started-with-aspnet-core-nextjs",
+    "content": "<p>Introduction text...</p><img src=\"/uploads/blogs/7b5879ea-0bd4-49c0-8da1-3c58ecb1ff19.png\" /><p>Conclusion...</p>",
+    "summary": "Introduction text... Conclusion...",
+    "status": "published",
+    "seoJson": null,
+    "viewCount": 0,
+    "readingTimeMinutes": 3,
+    "authorId": "e4c5b3a1-7e89-4a92-91e8-78229b0df111",
+    "authorName": "John Doe",
+    "authorAvatar": "http://localhost:5027/uploads/users/avatar.jpg",
+    "coverImage": "http://localhost:5027/uploads/blogs/cover-8b2c.png",
+    "publishedAt": "2026-08-23T10:55:00Z",
+    "createdAt": "2026-08-23T10:55:00Z",
+    "categories": [
+      {
+        "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+        "name": "Web Development",
+        "slug": "web-development",
+        "description": "Frontend and backend tutorials.",
+        "icon": "http://localhost:5027/uploads/categories/web-dev.png"
+      }
+    ],
+    "media": [
+      {
+        "id": "11111111-2222-3333-4444-555555555555",
+        "filePath": "/uploads/blogs/cover-8b2c.png",
+        "fileName": "cover-8b2c.png",
+        "fileUrl": "http://localhost:5027/uploads/blogs/cover-8b2c.png",
+        "mimeType": ".png",
+        "fileSize": 254100,
+        "displayOrder": 0,
+        "isPrimary": true,
+        "createdAt": "2026-08-23T10:55:00Z"
+      },
+      {
+        "id": "22222222-3333-4444-5555-666666666666",
+        "filePath": "/uploads/blogs/7b5879ea-0bd4-49c0-8da1-3c58ecb1ff19.png",
+        "fileName": "7b5879ea-0bd4-49c0-8da1-3c58ecb1ff19.png",
+        "fileUrl": "http://localhost:5027/uploads/blogs/7b5879ea-0bd4-49c0-8da1-3c58ecb1ff19.png",
+        "mimeType": ".png",
+        "fileSize": 128450,
+        "displayOrder": 1,
+        "isPrimary": false,
+        "createdAt": "2026-08-23T10:55:00Z"
+      }
+    ]
+  }
+}
+```
+
+---
+
+## 7. TypeScript Interfaces
 
 Copy and paste these definitions into your frontend project (e.g., `src/types/api.ts`):
 
@@ -268,161 +391,168 @@ export interface RegisterUserResponse {
   token: string;
   createdAt: string;
 }
+
+// ==========================================
+// 4. Blog & Media Interfaces
+// ==========================================
+export type BlogStatus = 'draft' | 'published';
+
+export interface UploadBlogImageResponse {
+  fileUrl: string;
+  fullUrl: string | null;
+  fileName: string;
+  originalFileName: string | null;
+  fileSize: number;
+}
+
+export interface BlogMediaResponse {
+  id: string;
+  filePath: string;
+  fileName: string | null;
+  fileUrl: string | null;
+  mimeType: string | null;
+  fileSize: number | null;
+  displayOrder: number;
+  isPrimary: boolean;
+  createdAt: string;
+}
+
+export interface CreateBlogRequest {
+  title: string;
+  content: string;
+  summary?: string;
+  status?: BlogStatus;
+  seoJson?: string;
+  coverImage?: File | null;
+  categoryIds?: string[];
+}
+
+export interface BlogResponse {
+  id: string;
+  title: string;
+  content: string;
+  slug: string;
+  summary: string | null;
+  status: string;
+  seoJson: string | null;
+  viewCount: number;
+  readingTimeMinutes: number;
+  authorId: string;
+  authorName: string | null;
+  authorAvatar: string | null;
+  coverImage: string | null;
+  publishedAt: string | null;
+  createdAt: string;
+  categories: CategoryResponse[];
+  media: BlogMediaResponse[];
+}
 ```
 
 ---
 
-## 6. Frontend Integration Code Examples
+## 8. Frontend Integration Code Examples
 
-### 6.1 Create Category (Axios Example)
+### 8.1 Upload Blog Content Image (Rich Text / WYSIWYG Editor Handler)
 
 ```typescript
-import axios, { AxiosError } from 'axios';
-import { ApiResponse, CategoryResponse, CreateCategoryRequest } from './types/api';
+import axios from 'axios';
+import { ApiResponse, UploadBlogImageResponse } from './types/api';
 
 const apiClient = axios.create({
   baseURL: 'http://localhost:5027/api',
 });
 
-export async function createCategory(
-  payload: CreateCategoryRequest,
+export async function uploadBlogEditorImage(
+  file: File,
   token: string
-): Promise<CategoryResponse> {
+): Promise<UploadBlogImageResponse> {
   const formData = new FormData();
-  formData.append('Name', payload.name.trim());
+  formData.append('file', file);
 
-  if (payload.description && payload.description.trim()) {
-    formData.append('Description', payload.description.trim());
-  }
-
-  if (payload.icon) {
-    formData.append('Icon', payload.icon);
-  }
-
-  try {
-    const response = await apiClient.post<ApiResponse<CategoryResponse>>(
-      '/categories',
-      formData,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          // Note: Axios automatically sets the Content-Type to multipart/form-data with boundary
-        },
-      }
-    );
-
-    if (!response.data.success || !response.data.data) {
-      throw new Error(response.data.message || 'Failed to create category.');
+  const response = await apiClient.post<ApiResponse<UploadBlogImageResponse>>(
+    '/blogs/upload-image',
+    formData,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
     }
+  );
 
-    return response.data.data;
-  } catch (error) {
-    if (axios.isAxiosError(error) && error.response?.data) {
-      const apiError = error.response.data as ApiResponse<null>;
-      throw new Error(apiError.message || 'Error occurred while creating category.');
-    }
-    throw error;
+  if (!response.data.success || !response.data.data) {
+    throw new Error(response.data.message || 'Failed to upload image.');
   }
+
+  return response.data.data;
 }
 ```
 
-### 6.2 Create Category (Native `fetch` Example)
-
-```typescript
-import { ApiResponse, CategoryResponse, CreateCategoryRequest } from './types/api';
-
-export async function createCategoryFetch(
-  payload: CreateCategoryRequest,
-  token: string
-): Promise<CategoryResponse> {
-  const formData = new FormData();
-  formData.append('Name', payload.name);
-
-  if (payload.description) {
-    formData.append('Description', payload.description);
-  }
-
-  if (payload.icon) {
-    formData.append('Icon', payload.icon);
-  }
-
-  const response = await fetch('http://localhost:5027/api/categories', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      // IMPORTANT: DO NOT set 'Content-Type': 'multipart/form-data'. 
-      // The browser must automatically set it along with the boundary string.
-    },
-    body: formData,
-  });
-
-  const result: ApiResponse<CategoryResponse> = await response.json();
-
-  if (!response.ok || !result.success || !result.data) {
-    throw new Error(result.message || 'Failed to create category.');
-  }
-
-  return result.data;
-}
-```
-
-### 6.3 Register User (Axios Example)
+### 8.2 Create Blog Post (Axios Example)
 
 ```typescript
 import axios from 'axios';
-import { ApiResponse, RegisterUserRequest, RegisterUserResponse } from './types/api';
+import { ApiResponse, BlogResponse, CreateBlogRequest } from './types/api';
 
-export async function registerUser(
-  payload: RegisterUserRequest
-): Promise<RegisterUserResponse> {
+export async function createBlog(
+  payload: CreateBlogRequest,
+  token: string
+): Promise<BlogResponse> {
   const formData = new FormData();
-  formData.append('FirstName', payload.firstName);
-  formData.append('LastName', payload.lastName);
-  formData.append('Role', payload.role);
-  formData.append('Email', payload.email);
-  formData.append('Password', payload.password);
-  formData.append('ConfirmPassword', payload.confirmPassword);
+  formData.append('Title', payload.title.trim());
+  formData.append('Content', payload.content);
 
-  if (payload.bio) {
-    formData.append('Bio', payload.bio);
+  if (payload.summary && payload.summary.trim()) {
+    formData.append('Summary', payload.summary.trim());
   }
 
-  if (payload.avatar) {
-    formData.append('Avatar', payload.avatar);
+  if (payload.status) {
+    formData.append('Status', payload.status);
   }
 
-  try {
-    const response = await axios.post<ApiResponse<RegisterUserResponse>>(
-      'http://localhost:5027/api/auth/register',
-      formData
-    );
+  if (payload.seoJson) {
+    formData.append('SeoJson', payload.seoJson);
+  }
 
-    if (!response.data.success || !response.data.data) {
-      throw new Error(response.data.message || 'Registration failed.');
+  if (payload.coverImage) {
+    formData.append('CoverImage', payload.coverImage);
+  }
+
+  if (payload.categoryIds && payload.categoryIds.length > 0) {
+    payload.categoryIds.forEach((catId) => {
+      formData.append('CategoryIds', catId);
+    });
+  }
+
+  const response = await apiClient.post<ApiResponse<BlogResponse>>(
+    '/blogs',
+    formData,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
     }
+  );
 
-    return response.data.data;
-  } catch (error) {
-    if (axios.isAxiosError(error) && error.response?.data) {
-      const apiError = error.response.data as ApiResponse<null>;
-      throw new Error(apiError.message || 'Registration failed.');
-    }
-    throw error;
+  if (!response.data.success || !response.data.data) {
+    throw new Error(response.data.message || 'Failed to create blog.');
   }
+
+  return response.data.data;
 }
 ```
 
 ---
 
-## 7. Frontend Best Practices & Important Tips
+## 9. Frontend Best Practices & Important Tips
 
-1. **Do Not Set `Content-Type: multipart/form-data` manually**:
-   - When sending `FormData` via `fetch` or `axios`, do **not** manually define the `Content-Type` header. Let the browser generate it automatically with the multi-part boundary (e.g. `multipart/form-data; boundary=----WebKitFormBoundary...`).
-2. **Omit Optional Empty Fields**:
-   - If an optional field like `description` or `bio` is empty, do not append an empty string or `"null"`. Either omit the key from `FormData` or only append if `value.trim().length > 0`.
-3. **Role Validation on Registration**:
-   - Ensure the dropdown/radio buttons for `Role` on the registration form only offer `"Author"` or `"User"`. `"Admin"` is restricted and will be rejected with HTTP 400.
+1. **Rich-Text Editor Image Handling**:
+   - When an author inserts an image inside the editor (e.g. TipTap, Quill, Slate, Markdown), call `uploadBlogEditorImage(file, token)`.
+   - Take the returned `fullUrl` or `fileUrl` and insert `<img src="${fullUrl}" />` at the cursor position.
+   - When the blog is finally created via `/api/blogs`, the backend will automatically parse all `/uploads/blogs/...` links from `content` and link them to `BlogHasMedia`.
+2. **Category Selection**:
+   - Send multiple categories by calling `formData.append('CategoryIds', categoryId)` once for each selected category ID.
+3. **Do Not Set `Content-Type: multipart/form-data` manually**:
+   - Let the browser automatically set the header with the multipart boundary.
 4. **Token Persistence**:
-   - After a successful `201 Created` from `/api/auth/register`, store `data.token` into `localStorage` / `sessionStorage` or cookies, and attach it to subsequent requests using the `Authorization: Bearer <token>` header.
-5. **Handling Image Previews**:
-   - Before uploading an icon/avatar, preview it locally using `URL.createObjectURL(file)` to enhance user experience. Clean up with `URL.revokeObjectURL()` on component unmount.
+   - Attach the author JWT token in the `Authorization: Bearer <token>` header for all author operations.
+
