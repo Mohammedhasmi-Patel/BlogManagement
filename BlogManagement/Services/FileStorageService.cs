@@ -97,7 +97,7 @@ public class FileStorageService : IFileStorageService
         return Task.CompletedTask;
     }
 
-    public string? GetSignedUrlAsync(string fileUrl, CancellationToken cancellationToken = default)
+    public string? GetSignedUrlAsync(string? fileUrl, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(fileUrl))
         {

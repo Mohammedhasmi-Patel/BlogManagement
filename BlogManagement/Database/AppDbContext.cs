@@ -17,6 +17,7 @@ namespace BlogManagement.Database
         public DbSet<Like> Likes => Set<Like>();
         public DbSet<Comment> Comments => Set<Comment>();
         public DbSet<UserFollow> UserFollows => Set<UserFollow>();
+        public DbSet<BlogHasMedia> BlogHasMedia => Set<BlogHasMedia>();
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -109,6 +110,17 @@ namespace BlogManagement.Database
                     .WithMany(u => u.Likes)
                     .HasForeignKey(l => l.UserId)
                     .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // BlogHasMedia relations
+            builder.Entity<BlogHasMedia>(entity =>
+            {
+                entity.HasKey(m => m.Id);
+
+                entity.HasOne(m => m.Blog)
+                    .WithMany(b => b.Media)
+                    .HasForeignKey(m => m.BlogId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
         }
     }
