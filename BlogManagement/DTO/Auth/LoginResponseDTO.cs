@@ -8,5 +8,6 @@ public class LoginResponseDTO
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
     public string? Avatar { get; set; }
+    public string? Role { get; set; }
     public string? Bio { get; set; }
 }

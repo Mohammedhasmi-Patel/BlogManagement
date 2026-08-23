@@ -73,6 +73,8 @@ public class AuthService(AppDbContext context,UserManager<AppUser> userManager,I
             var responseData = user.Adapt<RegisterUserResponseDTO>();
             responseData.Token = await _tokenService.GenerateJwtTokenAsync(user);
             responseData.Avatar = user.GetUserProfileUrl(_options);
+            var userRole = (await _userManager.GetRolesAsync(user)).FirstOrDefault();
+            responseData.Role = userRole;
 
             return ApiResponse<RegisterUserResponseDTO>.SuccessResponse(responseData, 201, "User registered successfully.");
         }
@@ -106,6 +108,8 @@ public class AuthService(AppDbContext context,UserManager<AppUser> userManager,I
         var responseData = user.Adapt<LoginResponseDTO>();
         responseData.Token = await _tokenService.GenerateJwtTokenAsync(user);
         responseData.Avatar = user.GetUserProfileUrl(_options);
+        var userRole = (await _userManager.GetRolesAsync(user)).FirstOrDefault();
+        responseData.Role = userRole;
 
         return ApiResponse<LoginResponseDTO>.SuccessResponse(responseData, 200, "User logged in successfully.");
     }

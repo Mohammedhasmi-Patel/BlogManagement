@@ -11,14 +11,9 @@ namespace BlogManagement.Controllers;
 
 [Route("api/categories")]
 [Authorize(Roles = nameof(UserRoleEnum.Author))]
-public class CategoryController : BaseController
+public class CategoryController(ICategoryService categoryService) : BaseController
 {
-    private readonly ICategoryService _categoryService;
-
-    public CategoryController(ICategoryService categoryService)
-    {
-        _categoryService = categoryService;
-    }
+    private readonly ICategoryService _categoryService = categoryService;
 
     [HttpPost]
     [Consumes("multipart/form-data")]
@@ -34,15 +29,13 @@ public class CategoryController : BaseController
     }
 
     [HttpGet]
-    [Consumes("application/json")]
-    [ProducesResponseType(typeof(ApiResponse<CategoryResponseDTO>), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ApiResponse<PaginationResult<CategoryResponseDTO>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> GetAllAsync(GetCategoriesRequestDTO requestDTO,CancellationToken ct)
+    public async Task<IActionResult> GetAllAsync([FromQuery] GetCategoriesRequestDTO requestDTO, CancellationToken ct)
     {
         var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? throw new UnauthorizedException("Unauthorized user.");
-        var response = await _categoryService.GetAllAsync(requestDTO,userEmail,ct);  
-        return Ok(response);
+        var response = await _categoryService.GetAllAsync(requestDTO, userEmail, ct);
+        return StatusCode(response.StatusCode, response);
     }
 }

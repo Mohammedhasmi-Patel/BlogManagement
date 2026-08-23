@@ -1,6 +1,7 @@
 using System.Text;
 using BlogManagement.Configurations;
 using BlogManagement.Database;
+using BlogManagement.DTO.Common;
 using BlogManagement.Models;
 using BlogManagement.ServiceContracts;
 using BlogManagement.Services;
@@ -11,55 +12,84 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
-namespace BlogManagement.Extension
+namespace BlogManagement.Extension;
+
+public static class ConfigureProjectServices
 {
-    public static class ConfigureProjectServices
+    public static IServiceCollection ConfigureProjectService(this IServiceCollection service, IConfiguration configuration)
     {
-        public static IServiceCollection ConfigureProjectService(this IServiceCollection service, IConfiguration configuration)
+
+        service.Configure<JwtConfiguration>(configuration.GetSection("JwtConfiguration"));
+        service.Configure<FileUploadSettings>(configuration.GetSection("FileUpload"));
+        service.Configure<AppSettings>(configuration.GetSection("AppSettings"));
+
+        JwtConfiguration jwtConfiguration = configuration.GetSection("JwtConfiguration").Get<JwtConfiguration>()!;
+        service.AddControllers();
+
+        string databaseUrl = configuration.GetConnectionString("DefaultConnection")!;
+        service.AddSwaggerGen();
+        service.AddDbContext<AppDbContext>(options => options.UseSqlServer(databaseUrl));
+
+        service.AddIdentityCore<AppUser>()
+                .AddRoles<AppRole>()
+                .AddEntityFrameworkStores<AppDbContext>()
+                .AddDefaultTokenProviders();
+
+        service.AddAuthentication(options =>
         {
-
-            service.Configure<JwtConfiguration>(configuration.GetSection("JwtConfiguration"));
-            service.Configure<FileUploadSettings>(configuration.GetSection("FileUpload"));
-            service.Configure<AppSettings>(configuration.GetSection("AppSettings"));
-
-            JwtConfiguration jwtConfiguration = configuration.GetSection("JwtConfiguration").Get<JwtConfiguration>()!;
-            service.AddAuthentication(options =>
+            options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+            options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+            options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+        }).AddJwtBearer(options =>
+        {
+            options.TokenValidationParameters = new TokenValidationParameters()
             {
-                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-            }).AddJwtBearer(options =>
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateIssuerSigningKey = true,
+                ValidateLifetime = true,
+                ValidIssuer = jwtConfiguration.Issuer,
+                ValidAudience = jwtConfiguration.Audience,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtConfiguration.SecretKey))
+            };
+
+            options.Events = new JwtBearerEvents
             {
-                options.TokenValidationParameters = new TokenValidationParameters()
+                OnChallenge = async context =>
                 {
-                    ValidateIssuer = true,
-                    ValidateAudience = true,
-                    ValidateIssuerSigningKey = true,
-                    ValidateLifetime = true,
-                    ValidIssuer = jwtConfiguration.Issuer,
-                    ValidAudience = jwtConfiguration.Audience,
-                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtConfiguration.SecretKey))
-                };
-            });
-            service.AddControllers();
-            string databaseUrl = configuration.GetConnectionString("DefaultConnection")!;
+                    context.HandleResponse();
+                    context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                    context.Response.ContentType = "application/json";
 
-            service.AddSwaggerGen();
-            service.AddDbContext<AppDbContext>(options => options.UseSqlServer(databaseUrl));
-            service.AddIdentity<AppUser, AppRole>()
-                    .AddEntityFrameworkStores<AppDbContext>()
-                    .AddDefaultTokenProviders();
+                    var response = ApiResponse<object>.ErrorResponse(StatusCodes.Status401Unauthorized, "Unauthorized.");
+                    await context.Response.WriteAsJsonAsync(response);
+                },
+                OnForbidden = async context =>
+                {
+                    context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    context.Response.ContentType = "application/json";
 
-            service.AddValidatorsFromAssembly(typeof(ConfigureProjectServices).Assembly);
+                    var response = ApiResponse<object>.ErrorResponse(
+                        StatusCodes.Status403Forbidden,
+                        "You do not have permission to access this resource."
+                    );
 
-            service.AddMapster();
+                    await context.Response.WriteAsJsonAsync(response);
+                }
+            };
 
-            service.AddScoped<IAuthService, AuthService>();
-            service.AddScoped<IFileStorageService,FileStorageService>();
-            service.AddScoped<ITokenService, TokenService>();
-            service.AddScoped<ICategoryService,CategoryService>();
+        });
 
+        service.AddValidatorsFromAssembly(typeof(ConfigureProjectServices).Assembly);
 
-            return service;
-        }
+        service.AddMapster();
+
+        service.AddScoped<IAuthService, AuthService>();
+        service.AddScoped<IFileStorageService, FileStorageService>();
+        service.AddScoped<ITokenService, TokenService>();
+        service.AddScoped<ICategoryService, CategoryService>();
+
+        return service;
     }
+
 }

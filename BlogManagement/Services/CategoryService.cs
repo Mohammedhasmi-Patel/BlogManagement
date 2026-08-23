@@ -55,7 +55,7 @@ public class CategoryService(AppDbContext context, UserManager<AppUser> userMana
             var responseData = category.Adapt<CategoryResponseDTO>();
             return ApiResponse<CategoryResponseDTO>.SuccessResponse(responseData,201,"Category created successfully.");
         }
-        catch (Exception ex)
+        catch
         {
             // await _storageService.DeleteAsync()
             await transaction.RollbackAsync(ct);
@@ -63,35 +63,47 @@ public class CategoryService(AppDbContext context, UserManager<AppUser> userMana
         }
     }
 
-    public async Task<ApiResponse<PaginationResult<CategoryResponseDTO>>> GetAllAsync(GetCategoriesRequestDTO requestDTO,string userEmail, CancellationToken ct)
+    public async Task<ApiResponse<PaginationResult<CategoryResponseDTO>>> GetAllAsync(GetCategoriesRequestDTO requestDTO,string email, CancellationToken ct)
     {
-        // throw new NotImplementedException();
-        var categoryQuery = _context.Categories.AsQueryable();
-        string search = requestDTO.Search.ToLower();
-        string sortOrder = requestDTO.SortOrder;
-        if (!string.IsNullOrEmpty(search))
+        AppUser? appUser = await _userManager.FindByEmailAsync(email) ?? throw new UnauthorizedAccessException("Unauthorized user.");;
+    
+        var categoryQuery = _context.Categories
+                                    .AsNoTracking()
+                                    .Where(c => c.DeletedAt == null && c.CreatedBy == appUser.Id);
+
+        if (!string.IsNullOrWhiteSpace(requestDTO.Search))
         {
-            categoryQuery = categoryQuery.Where(c => c.Name.Contains(search) || c.Slug.Contains(search) || c.Description.Contains(search));
+            string search = requestDTO.Search.Trim();
+            categoryQuery = categoryQuery.Where(c =>
+                c.Name.Contains(search) ||
+                c.Slug.Contains(search) ||
+                (c.Description != null && c.Description.Contains(search)));
         }
 
-        var SortBy = requestDTO.SortBy switch
+        categoryQuery = (requestDTO.SortBy?.Trim().ToLower(), requestDTO.SortOrder?.Trim().ToLower()) switch
         {
-            "Name" => sortOrder == "asc" ? categoryQuery = categoryQuery.OrderBy(c => c.Name) : categoryQuery = categoryQuery.OrderByDescending(c => c.Name),
-            "Slug" => sortOrder == "asc" ? categoryQuery = categoryQuery.OrderBy(c => c.Slug) : categoryQuery = categoryQuery.OrderByDescending(c => c.Slug),
-            "Description" => sortOrder == "asc" ? categoryQuery = categoryQuery.OrderBy(c => c.Description) : categoryQuery = categoryQuery.OrderByDescending(c => c.Description),
-            _ => sortOrder == "asc" ? categoryQuery = categoryQuery.OrderBy(c => c.CreatedAt) : categoryQuery = categoryQuery.OrderByDescending(c => c.CreatedAt),
+            ("name", "desc") => categoryQuery.OrderByDescending(c => c.Name),
+            ("name", _) => categoryQuery.OrderBy(c => c.Name),
+            ("slug", "desc") => categoryQuery.OrderByDescending(c => c.Slug),
+            ("slug", _) => categoryQuery.OrderBy(c => c.Slug),
+            ("description", "desc") => categoryQuery.OrderByDescending(c => c.Description),
+            ("description", _) => categoryQuery.OrderBy(c => c.Description),
+            (_, "asc") => categoryQuery.OrderBy(c => c.CreatedAt),
+            _ => categoryQuery.OrderByDescending(c => c.CreatedAt),
         };
 
         int totalCount = await categoryQuery.CountAsync(ct);
 
-        List<Category> categories = await categoryQuery
-                                        .Skip(requestDTO.PageNumber * requestDTO.PageSize)
-                                        .Take(requestDTO.PageSize)
-                                        .ToListAsync(cancellationToken: ct);
+        int skip = (requestDTO.PageNumber - 1) * requestDTO.PageSize;
 
-        List<CategoryResponseDTO> categoriesListingDTO = categories.ConvertAll(c => c.Adapt<CategoryResponseDTO>());
+        List<CategoryResponseDTO> categoriesListingDTO = await categoryQuery
+            .Skip(skip)
+            .Take(requestDTO.PageSize)
+            .ProjectToType<CategoryResponseDTO>()
+            .ToListAsync(ct);
+
         var responseDTO = new PaginationResult<CategoryResponseDTO>(categoriesListingDTO, totalCount, requestDTO.PageNumber, requestDTO.PageSize);
         return ApiResponse<PaginationResult<CategoryResponseDTO>>.SuccessResponse(responseDTO, 200, "Categories list fetched successfully.");
     }
-
 }
+
