@@ -118,6 +118,8 @@ public static class ConfigureProjectServices
         service.AddScoped<IFileStorageService, FileStorageService>();
         service.AddScoped<ITokenService, TokenService>();
         service.AddScoped<ICategoryService, CategoryService>();
+        service.AddScoped<IBlogService, BlogService>();
+        service.AddScoped<IBookmarkService, BookmarkService>();
 
         return service;
     }

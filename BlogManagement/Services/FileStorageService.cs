@@ -104,8 +104,15 @@ public class FileStorageService : IFileStorageService
             return null;
         }
 
-        string baseUrl = _setting.BaseUrl;
-        return $"{baseUrl}{fileUrl}";
+        if (fileUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            fileUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            return fileUrl;
+        }
+
+        string baseUrl = _setting.BaseUrl?.TrimEnd('/') ?? string.Empty;
+        var path = fileUrl.StartsWith('/') ? fileUrl : $"/{fileUrl}";
+        return $"{baseUrl}{path}";
     }
 
 }

@@ -20,9 +20,9 @@ public class BlogController(IBlogService blogService) : BaseController
     [ProducesResponseType(typeof(ApiResponse<UploadBlogImageResponseDTO>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> UploadImageAsync([FromForm] IFormFile file, CancellationToken ct)
+    public async Task<IActionResult> UploadImageAsync([FromForm] UploadBlogImageRequestDTO requestDTO, CancellationToken ct)
     {
-        var response = await _blogService.UploadContentImageAsync(file, ct);
+        var response = await _blogService.UploadContentImageAsync(requestDTO.File, ct);
         return StatusCode(response.StatusCode, response);
     }
 

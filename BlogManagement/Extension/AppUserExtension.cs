@@ -20,6 +20,12 @@ namespace BlogManagement.Extension
                 return null;
             }
 
+            if (user.Avatar.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                user.Avatar.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                return user.Avatar;
+            }
+
             var baseUrl = setting.Value.BaseUrl?.TrimEnd('/') ?? string.Empty;
             var avatarPath = user.Avatar.StartsWith('/') ? user.Avatar : $"/{user.Avatar}";
             return $"{baseUrl}{avatarPath}";

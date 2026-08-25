@@ -44,7 +44,7 @@ public class CategoryService(AppDbContext context, UserManager<AppUser> userMana
             }
 
             Category category = requestDTO.Adapt<Category>();
-            category.Slug = await category.GenerateUniqueSlug(_context);
+            category.Slug = await category.GenerateUniqueSlug(_context, ct: ct);
             category.Icon = fileUrl;
             category.CreatedBy = appUser.Id;
             var result = await _context.Categories.AddAsync(category, ct) ?? throw new BadRequestException("Something went wrong while adding the category.");
@@ -105,7 +105,7 @@ public class CategoryService(AppDbContext context, UserManager<AppUser> userMana
         {
             if (category.Icon != null)
             {
-                var fileResponse =  _storageService.GetSignedUrlAsync(category.Icon, ct);
+                var fileResponse = _storageService.GetSignedUrlAsync(category.Icon, ct);
                 category.Icon = fileResponse;
             }
         }

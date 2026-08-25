@@ -5,14 +5,10 @@ using Microsoft.AspNetCore.Mvc;
 namespace BlogManagement.Controllers;
 
 [Route("api/auth")]
-public class AuthController : BaseController
+public class AuthController(IAuthService authService) : BaseController
 {
-    private readonly IAuthService _authService;
+    private readonly IAuthService _authService = authService;
 
-    public AuthController(IAuthService authService)
-    {
-        _authService = authService;
-    }
     [HttpPost]
     [Route("register")]
     public async Task<IActionResult> RegisterUserAsync([FromForm] RegisterUserRequestDTO request)
@@ -23,7 +19,7 @@ public class AuthController : BaseController
 
     [HttpPost]
     [Route("login")]
-    public async Task<IActionResult> LoginUserAsync( LoginRequestDTO request)
+    public async Task<IActionResult> LoginUserAsync([FromBody] LoginRequestDTO request)
     {
         var response = await _authService.LoginUserAsync(request);
         return Ok(response);

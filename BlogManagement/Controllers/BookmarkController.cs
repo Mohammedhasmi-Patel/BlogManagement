@@ -8,19 +8,15 @@ namespace BlogManagement.Controllers;
 
 [Route("api/bookmarks")]
 [Authorize]
-public class BookmarkController : BaseController
+public class BookmarkController(IBookmarkService bookmarkService) : BaseController
 {
-    private readonly IBookmarkService _bookmarkService;
+    private readonly IBookmarkService _bookmarkService = bookmarkService;
 
-    public BookmarkController(IBookmarkService bookmarkService)
-    {
-        _bookmarkService = bookmarkService;
-    }
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] Guid BlogId)
     {
-        var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? throw new BadRequestException("Invalid tpken.");
+        var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? throw new BadRequestException("Invalid token.");
         var response = await _bookmarkService.CreateAsync(BlogId, userEmail);
-        return Ok(response);
+        return StatusCode(response.StatusCode, response);
     }
 }
