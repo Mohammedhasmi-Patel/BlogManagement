@@ -5,7 +5,6 @@ using BlogManagement.Enum;
 using BlogManagement.Exceptions;
 using BlogManagement.Models;
 using BlogManagement.ServiceContracts;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,6 +18,7 @@ public class UserFollowService(UserManager<AppUser> userManager, AppDbContext co
     public async Task<ApiResponse<object>> FollowUserAsync(CreateUserFollowRequestDTO requestDTO, string userEmail, CancellationToken ct)
     {
         var user = await _userManager.Users
+            .AsNoTracking()
             .Where(u => u.Email == userEmail && u.DeletedAt == null)
             .FirstOrDefaultAsync(ct) ?? throw new NotFoundException("User not found.");
 
@@ -28,6 +28,7 @@ public class UserFollowService(UserManager<AppUser> userManager, AppDbContext co
         }
 
         var author = await _userManager.Users
+            .AsNoTracking()
             .Where(u => u.Id == requestDTO.AuthorId && u.DeletedAt == null)
             .FirstOrDefaultAsync(ct) ?? throw new NotFoundException("Author not found.");
 
@@ -60,6 +61,7 @@ public class UserFollowService(UserManager<AppUser> userManager, AppDbContext co
     public async Task<ApiResponse<object>> UnfollowUserAsync(Guid authorId, string userEmail, CancellationToken ct)
     {
         var user = await _userManager.Users
+            .AsNoTracking()
             .Where(u => u.Email == userEmail && u.DeletedAt == null)
             .FirstOrDefaultAsync(ct) ?? throw new NotFoundException("User not found.");
 

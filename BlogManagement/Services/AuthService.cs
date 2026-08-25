@@ -22,7 +22,7 @@ public class AuthService(AppDbContext context,UserManager<AppUser> userManager,I
     private readonly AppDbContext _context = context;
     private readonly IOptions<AppSettings> _options = options;
 
-    public async Task<ApiResponse<RegisterUserResponseDTO>> RegisterUserAsync(RegisterUserRequestDTO requestDTO)
+    public async Task<ApiResponse<RegisterUserResponseDTO>> RegisterUserAsync(RegisterUserRequestDTO requestDTO, CancellationToken ct = default)
     {
         var existingUser = await _userManager.FindByEmailAsync(requestDTO.Email);
         if (existingUser != null)
@@ -38,7 +38,7 @@ public class AuthService(AppDbContext context,UserManager<AppUser> userManager,I
         string role = roleEnum.ToString();
         string? uploadedFilePath = null;
 
-        await using var transaction = await _context.Database.BeginTransactionAsync();
+        await using var transaction = await _context.Database.BeginTransactionAsync(ct);
         try
         {
             var user = requestDTO.Adapt<AppUser>();
@@ -46,7 +46,7 @@ public class AuthService(AppDbContext context,UserManager<AppUser> userManager,I
 
             if (requestDTO.Avatar != null)
             {
-                var uploadResult = await _fileService.UploadAsync(requestDTO.Avatar, "users", isFileRequired: false);
+                var uploadResult = await _fileService.UploadAsync(requestDTO.Avatar, "users", isFileRequired: false, cancellationToken: ct);
                 if (uploadResult != null)
                 {
                     user.Avatar = uploadResult.FileUrl;
@@ -68,7 +68,7 @@ public class AuthService(AppDbContext context,UserManager<AppUser> userManager,I
                 throw new BadRequestException(firstMessage);
             }
 
-            await transaction.CommitAsync();
+            await transaction.CommitAsync(ct);
 
             var responseData = user.Adapt<RegisterUserResponseDTO>();
             responseData.Token = await _tokenService.GenerateJwtTokenAsync(user);
@@ -76,22 +76,22 @@ public class AuthService(AppDbContext context,UserManager<AppUser> userManager,I
             var userRole = (await _userManager.GetRolesAsync(user)).FirstOrDefault();
             responseData.Role = userRole;
 
-            return ApiResponse<RegisterUserResponseDTO>.SuccessResponse(responseData, 201, "User registered successfully.");
+            return ApiResponse<RegisterUserResponseDTO>.SuccessResponse(responseData, StatusCodes.Status201Created, "User registered successfully.");
         }
         catch
         {
-            await transaction.RollbackAsync();
+            await transaction.RollbackAsync(ct);
 
             if (!string.IsNullOrEmpty(uploadedFilePath))
             {
-                await _fileService.DeleteAsync(uploadedFilePath);
+                await _fileService.DeleteAsync(uploadedFilePath, ct);
             }
 
             throw;
         }
     }
 
-    public async Task<ApiResponse<LoginResponseDTO>> LoginUserAsync(LoginRequestDTO loginRequestDTO)
+    public async Task<ApiResponse<LoginResponseDTO>> LoginUserAsync(LoginRequestDTO loginRequestDTO, CancellationToken ct = default)
     {
         var user = await _userManager.FindByEmailAsync(loginRequestDTO.Email);
         if (user == null || user.DeletedAt != null)
@@ -111,6 +111,6 @@ public class AuthService(AppDbContext context,UserManager<AppUser> userManager,I
         var userRole = (await _userManager.GetRolesAsync(user)).FirstOrDefault();
         responseData.Role = userRole;
 
-        return ApiResponse<LoginResponseDTO>.SuccessResponse(responseData, 200, "User logged in successfully.");
+        return ApiResponse<LoginResponseDTO>.SuccessResponse(responseData, StatusCodes.Status200OK, "User logged in successfully.");
     }
 }
