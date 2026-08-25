@@ -6,19 +6,12 @@ using Microsoft.Extensions.Options;
 
 namespace BlogManagement.Services;
 
-public class FileStorageService : IFileStorageService
+public class FileStorageService(IWebHostEnvironment env, IOptions<FileUploadSettings> options, IOptions<AppSettings> _options) : IFileStorageService
 {
 
-    private readonly IWebHostEnvironment _env;
-    private readonly FileUploadSettings _fileSetting;
-    private readonly AppSettings _setting;
-
-    public FileStorageService(IWebHostEnvironment env, IOptions<FileUploadSettings> options, IOptions<AppSettings> _options)
-    {
-        _env = env;
-        _fileSetting = options.Value;
-        _setting = _options.Value;
-    }
+    private readonly IWebHostEnvironment _env = env;
+    private readonly FileUploadSettings _fileSetting = options.Value;
+    private readonly AppSettings _setting = _options.Value;
 
     public async Task<FileUploadResultResponseDTO?> UploadAsync(IFormFile? file, string folder, bool isFileRequired = false, CancellationToken cancellationToken = default)
     {

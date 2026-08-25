@@ -16,33 +16,45 @@ public class LikeService(UserManager<AppUser> userManager, AppDbContext context)
 
     public async Task<ApiResponse<object>> CreateLikeAsync(CreateLikeRequestDTO requestDTO, string userEmail, CancellationToken ct = default)
     {
-        var user = await _userManager.Users.Where(u => u.Email == userEmail && u.DeletedAt == null).FirstOrDefaultAsync(ct) ?? throw new NotFoundException("User not found!");
-
-        var isBlogExist = await _context.Blogs.AnyAsync(b => b.Id == requestDTO.BlogId, ct);
-        if (!isBlogExist)
+        await using var transaction = await _context.Database.BeginTransactionAsync(ct);
+        try
         {
-            throw new NotFoundException("Blog not found!");
+
+            var user = await _userManager.Users.Where(u => u.Email == userEmail && u.DeletedAt == null).FirstOrDefaultAsync(ct) ?? throw new NotFoundException("User not found!");
+
+            var isBlogExist = await _context.Blogs.AnyAsync(b => b.Id == requestDTO.BlogId, ct);
+            if (!isBlogExist)
+            {
+                throw new NotFoundException("Blog not found!");
+            }
+
+            var isLiked = await _context.Likes.AnyAsync(l => l.BlogId == requestDTO.BlogId && l.UserId == user.Id, ct);
+            if (isLiked)
+            {
+                throw new ConflictException("You have already liked this blog!");
+            }
+
+            var like = new Like
+            {
+                Id = Guid.NewGuid(),
+                BlogId = requestDTO.BlogId,
+                UserId = user.Id
+            };
+            await _context.Likes.AddAsync(like, ct);
+            await _context.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+            return ApiResponse<object>.SuccessResponse(null, StatusCodes.Status201Created, "Like created successfully!");
         }
-
-        var isLiked = await _context.Likes.AnyAsync(l => l.BlogId == requestDTO.BlogId && l.UserId == user.Id, ct);
-        if (isLiked)
+        catch (Exception ex)
         {
-            throw new ConflictException("You have already liked this blog!");
+            await transaction.RollbackAsync(ct);
+            throw new InternalServerException("Something went wrong.");
         }
-
-        var like = new Like
-        {
-            Id = Guid.NewGuid(),
-            BlogId = requestDTO.BlogId,
-            UserId = user.Id
-        };
-        await _context.Likes.AddAsync(like, ct);
-        await _context.SaveChangesAsync(ct);
-        return ApiResponse<object>.SuccessResponse(null, StatusCodes.Status201Created, "Like created successfully!");
     }
 
     public async Task<ApiResponse<object>> RemoveLikeAsync(Guid blogId, string userEmail, CancellationToken ct = default)
     {
+        await using var transaction = await _context.Database.BeginTransactionAsync(ct);
         var user = await _userManager.Users.Where(u => u.Email == userEmail && u.DeletedAt == null).FirstOrDefaultAsync(ct) ?? throw new NotFoundException("User not found!");
 
         var like = await _context.Likes.FirstOrDefaultAsync(l => l.BlogId == blogId && l.UserId == user.Id, ct) ?? throw new NotFoundException("Like not found for this blog!");

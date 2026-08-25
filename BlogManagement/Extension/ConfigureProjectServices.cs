@@ -121,6 +121,7 @@ public static class ConfigureProjectServices
         service.AddScoped<IBlogService, BlogService>();
         service.AddScoped<IBookmarkService, BookmarkService>();
         service.AddScoped<ILikeService, LikeService>();
+        service.AddScoped<ICommentService, CommentService>();
 
         return service;
     }
