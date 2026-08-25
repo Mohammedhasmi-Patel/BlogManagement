@@ -17,62 +17,71 @@ namespace BlogManagement.Extension;
 
 public static class ConfigureProjectServices
 {
-    public static IServiceCollection ConfigureProjectService(this IServiceCollection service, IConfiguration configuration)
+    public static IServiceCollection ConfigureProjectService(this IServiceCollection services, IConfiguration configuration)
     {
+        services.AddAppConfigurations(configuration);
+        services.AddAppCors(configuration);
+        services.AddAppDatabaseAndIdentity(configuration);
+        services.AddAppAuthentication(configuration);
+        services.AddAppSwagger();
+        services.AddAppValidationAndMapping();
+        services.AddAppServices();
 
-        service.Configure<JwtConfiguration>(configuration.GetSection("JwtConfiguration"));
-        service.Configure<FileUploadSettings>(configuration.GetSection("FileUpload"));
-        service.Configure<AppSettings>(configuration.GetSection("AppSettings"));
+        services.AddControllers();
 
-        JwtConfiguration jwtConfiguration = configuration.GetSection("JwtConfiguration").Get<JwtConfiguration>()!;
-        List<string> allowedOrigins = configuration.GetSection("AllowedOrigins").Get<List<string>>()!;
+        return services;
+    }
 
-        service.AddCors(options =>
+    private static IServiceCollection AddAppConfigurations(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<JwtConfiguration>(configuration.GetSection("JwtConfiguration"));
+        services.Configure<FileUploadSettings>(configuration.GetSection("FileUpload"));
+        services.Configure<AppSettings>(configuration.GetSection("AppSettings"));
+
+        return services;
+    }
+
+    private static IServiceCollection AddAppCors(this IServiceCollection services, IConfiguration configuration)
+    {
+        List<string> allowedOrigins = configuration.GetSection("AllowedOrigins").Get<List<string>>() ?? [];
+
+        services.AddCors(options =>
         {
             options.AddPolicy("FrontendCors", policy => policy
-            .WithOrigins(allowedOrigins.ToArray()!)
-            .AllowAnyMethod()
-            .AllowAnyHeader());
+                .WithOrigins([.. allowedOrigins])
+                .AllowAnyMethod()
+                .AllowAnyHeader());
         });
 
-        service.AddControllers();
+        return services;
+    }
+
+    private static IServiceCollection AddAppDatabaseAndIdentity(this IServiceCollection services, IConfiguration configuration)
+    {
         string databaseUrl = configuration.GetConnectionString("DefaultConnection")!;
-        service.AddSwaggerGen(options =>
-        {
-            options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-            {
-                In = ParameterLocation.Header,
-                Description = "Please enter a valid JWT token",
-                Name = "Authorization",
-                Type = SecuritySchemeType.Http,
-                BearerFormat = "JWT",
-                Scheme = "Bearer"
-            });
 
-            options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
-            {
-                {
-                    new OpenApiSecuritySchemeReference("Bearer", document),
-                    new List<string>()
-                }
-            });
-        });
+        services.AddDbContext<AppDbContext>(options => options.UseSqlServer(databaseUrl));
 
-        service.AddDbContext<AppDbContext>(options => options.UseSqlServer(databaseUrl));
+        services.AddIdentityCore<AppUser>()
+            .AddRoles<AppRole>()
+            .AddEntityFrameworkStores<AppDbContext>()
+            .AddDefaultTokenProviders();
 
-        service.AddIdentityCore<AppUser>()
-                .AddRoles<AppRole>()
-                .AddEntityFrameworkStores<AppDbContext>()
-                .AddDefaultTokenProviders();
+        return services;
+    }
 
-        service.AddAuthentication(options =>
+    private static IServiceCollection AddAppAuthentication(this IServiceCollection services, IConfiguration configuration)
+    {
+        JwtConfiguration jwtConfiguration = configuration.GetSection("JwtConfiguration").Get<JwtConfiguration>()!;
+
+        services.AddAuthentication(options =>
         {
             options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
             options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
             options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
         }).AddJwtBearer(options =>
         {
-            options.TokenValidationParameters = new TokenValidationParameters()
+            options.TokenValidationParameters = new TokenValidationParameters
             {
                 ValidateIssuer = true,
                 ValidateAudience = true,
@@ -107,23 +116,57 @@ public static class ConfigureProjectServices
                     await context.Response.WriteAsJsonAsync(response);
                 }
             };
-
         });
 
-        service.AddValidatorsFromAssembly(typeof(ConfigureProjectServices).Assembly);
-
-        service.AddMapster();
-
-        service.AddScoped<IAuthService, AuthService>();
-        service.AddScoped<IFileStorageService, FileStorageService>();
-        service.AddScoped<ITokenService, TokenService>();
-        service.AddScoped<ICategoryService, CategoryService>();
-        service.AddScoped<IBlogService, BlogService>();
-        service.AddScoped<IBookmarkService, BookmarkService>();
-        service.AddScoped<ILikeService, LikeService>();
-        service.AddScoped<ICommentService, CommentService>();
-
-        return service;
+        return services;
     }
 
+    private static IServiceCollection AddAppSwagger(this IServiceCollection services)
+    {
+        services.AddSwaggerGen(options =>
+        {
+            options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+            {
+                In = ParameterLocation.Header,
+                Description = "Please enter a valid JWT token",
+                Name = "Authorization",
+                Type = SecuritySchemeType.Http,
+                BearerFormat = "JWT",
+                Scheme = "Bearer"
+            });
+
+            options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+            {
+                {
+                    new OpenApiSecuritySchemeReference("Bearer", document),
+                    new List<string>()
+                }
+            });
+        });
+
+        return services;
+    }
+
+    private static IServiceCollection AddAppValidationAndMapping(this IServiceCollection services)
+    {
+        services.AddValidatorsFromAssembly(typeof(ConfigureProjectServices).Assembly);
+        services.AddMapster();
+
+        return services;
+    }
+
+    private static IServiceCollection AddAppServices(this IServiceCollection services)
+    {
+        services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<ITokenService, TokenService>();
+        services.AddScoped<IFileStorageService, FileStorageService>();
+        services.AddScoped<ICategoryService, CategoryService>();
+        services.AddScoped<IBlogService, BlogService>();
+        services.AddScoped<IBookmarkService, BookmarkService>();
+        services.AddScoped<ILikeService, LikeService>();
+        services.AddScoped<ICommentService, CommentService>();
+        services.AddScoped<IUserFollowService, UserFollowService>();
+
+        return services;
+    }
 }
