@@ -23,9 +23,23 @@ public class CommentController(ICommentService commentService) : BaseController
 
     public async Task<IActionResult> CreateComment([FromBody] CreateCommentRequestDTO requestDTO, CancellationToken ct)
     {
-        string userEmail = User.FindFirstValue(ClaimTypes.Email) ?? throw new UnauthorizedAccessException("Unauthorized Access!");
+        string userEmail = User.FindFirstValue(ClaimTypes.Email) ?? throw new UnauthorizedException("Unauthorized Access!");
         var response = await _commentService.CreateCommentAsync(requestDTO, userEmail, ct);
         return StatusCode(StatusCodes.Status201Created, response);
+    }
+
+    [HttpPut("{commentId:guid}")]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateComment([FromRoute] Guid commentId, [FromBody] UpdateCommentRequestDTO requestDTO, CancellationToken ct)
+    {
+        string userEmail = User.FindFirstValue(ClaimTypes.Email) ?? throw new UnauthorizedException("Unauthorized Access!");
+        var response = await _commentService.UpdateCommentAsync(commentId, requestDTO, userEmail, ct);
+        return StatusCode(StatusCodes.Status200OK, response);
     }
 
     [HttpDelete("{commentId:guid}")]

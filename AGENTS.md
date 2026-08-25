@@ -160,3 +160,42 @@ name follows PascalCase
 like Auth , Product 
 
 DTO class Naming Convention : for request use RequestDTO as suffix & for response use ResponseDTO
+
+code review requirement 
+
+
+1. **Every controller action has `CancellationToken ct`** where the action is async.
+2. **Always pass `ct` through the service and EF Core async operations.**
+3. **Correct HTTP status codes**
+
+   * Create → `201 Created`
+   * Successful GET/update/action → `200 OK`
+   * Successful delete with no body → `204 NoContent`
+4. **Controller should remain thin.**
+
+   * Extract claims/user info.
+   * Call service.
+   * Return response.
+5. **User email is required only for protected/user-specific routes.**
+
+   * Public endpoints like login don't need it.
+6. **Every request payload uses a DTO**, even if it contains only one field.
+7. **DTO naming:**
+
+   * `FilenameRequestDTO`
+   * `FilenameResponseDTO`
+   * Example: `LoginUserRequestDTO`, `LoginUserResponseDTO`
+8. **No N+1 queries.**
+9. **Avoid unnecessary DB queries** — don't query the same data multiple times when one query can handle it.
+10. **Read-only EF queries should use `AsNoTracking()`** where tracking isn't required.
+11. **Don't return EF/domain entities directly from controllers**; map to `ResponseDTO`.
+12. **Business logic belongs in services**, not controllers.
+13. **Use your existing custom exceptions**, e.g.
+
+```csharp
+throw new UnauthorizedException("Invalid email or password.");
+```
+
+14. **Don't catch exceptions unnecessarily in services/controllers**; let your global exception middleware handle them.
+15. **Don't flag things just because they're a different coding style.** Only report actual issues or violations of these project conventions.
+

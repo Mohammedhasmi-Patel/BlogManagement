@@ -41,7 +41,34 @@ public class CommentService(AppDbContext context, UserManager<AppUser> userManag
 
             return ApiResponse<object>.SuccessResponse(null, StatusCodes.Status201Created, "Comment created successfully!");
         }
-        catch (Exception ex)
+        catch (Exception)
+        {
+            await transaction.RollbackAsync(ct);
+            throw;
+        }
+    }
+
+    public async Task<ApiResponse<object>> UpdateCommentAsync(Guid commentId, UpdateCommentRequestDTO requestDTO, string userEmail, CancellationToken ct = default)
+    {
+        await using var transaction = await _context.Database.BeginTransactionAsync(ct);
+        try
+        {
+            AppUser? user = await _userManager.FindByEmailAsync(userEmail) ?? throw new NotFoundException("User not found!");
+            Comment? comment = await _context.Comments.FirstOrDefaultAsync(c => c.Id == commentId, ct) ?? throw new NotFoundException("Comment not found!");
+            if (user.Id != comment.UserId)
+            {
+                throw new ForbiddenException("You are not authorized to update this comment!");
+            }
+
+            comment.Content = requestDTO.CommentText;
+            comment.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+
+            return ApiResponse<object>.SuccessResponse(null, StatusCodes.Status200OK, "Comment updated successfully!");
+        }
+        catch (Exception)
         {
             await transaction.RollbackAsync(ct);
             throw;
@@ -64,7 +91,7 @@ public class CommentService(AppDbContext context, UserManager<AppUser> userManag
             await transaction.CommitAsync(ct);
             return ApiResponse<object>.SuccessResponse(null, StatusCodes.Status200OK, "Comment deleted successfully!");
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             await transaction.RollbackAsync(ct);
             throw;
