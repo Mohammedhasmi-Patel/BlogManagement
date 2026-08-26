@@ -15,7 +15,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
     public DbSet<Comment> Comments => Set<Comment>();
     public DbSet<UserFollow> UserFollows => Set<UserFollow>();
     public DbSet<BlogHasMedia> BlogHasMedia => Set<BlogHasMedia>();
-
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);

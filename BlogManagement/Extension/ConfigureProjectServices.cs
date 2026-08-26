@@ -62,11 +62,17 @@ public static class ConfigureProjectServices
 
         services.AddDbContext<AppDbContext>(options => options.UseSqlServer(databaseUrl));
 
-        services.AddIdentityCore<AppUser>()
-            .AddRoles<AppRole>()
-            .AddEntityFrameworkStores<AppDbContext>()
-            .AddDefaultTokenProviders();
-
+    services
+        .AddIdentity<AppUser, AppRole>(options =>
+        {
+            options.Password.RequiredLength = 8;
+            options.Password.RequireDigit = true;
+            options.Password.RequireLowercase = true;
+            options.Password.RequireUppercase = true;
+            options.Password.RequireNonAlphanumeric = true;
+        })
+        .AddEntityFrameworkStores<AppDbContext>()
+        .AddDefaultTokenProviders();
         return services;
     }
 
@@ -166,6 +172,7 @@ public static class ConfigureProjectServices
         services.AddScoped<ILikeService, LikeService>();
         services.AddScoped<ICommentService, CommentService>();
         services.AddScoped<IUserFollowService, UserFollowService>();
+        services.AddScoped<IDropDownService, DropDownService>();
 
         return services;
     }

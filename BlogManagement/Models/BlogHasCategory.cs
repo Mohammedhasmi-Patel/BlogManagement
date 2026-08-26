@@ -1,11 +1,10 @@
-﻿namespace BlogManagement.Models
-{
-    public class BlogHasCategory
-    {
-        public Guid BlogId { get; set; }
-        public Guid CategoryId { get; set; }
+﻿namespace BlogManagement.Models;
 
-        public Blog Blog { get; set; } = null!;
-        public Category Category { get; set; } = null!;
-    }
+public class BlogHasCategory
+{
+    public Guid BlogId { get; set; }
+    public Guid CategoryId { get; set; }
+
+    public Blog Blog { get; set; } = null!;
+    public Category Category { get; set; } = null!;
 }

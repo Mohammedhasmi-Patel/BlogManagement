@@ -2,6 +2,7 @@ using BlogManagement.Configurations;
 using BlogManagement.Database;
 using BlogManagement.DTO.Blog;
 using BlogManagement.DTO.Category;
+using BlogManagement.DTO.Comment;
 using BlogManagement.DTO.Common;
 using BlogManagement.Exceptions;
 using BlogManagement.Extension;
@@ -142,9 +143,6 @@ public class BlogService(
             responseDTO.Categories = selectedCategories.Adapt<List<CategoryResponseDTO>>();
             responseDTO.Categories.ForEach(c => c.Icon = _fileStorageService.GetSignedUrlAsync(c.Icon, ct));
 
-            responseDTO.Media = mediaList.Adapt<List<BlogMediaResponseDTO>>();
-            responseDTO.Media.ForEach(m => m.FileUrl = _fileStorageService.GetSignedUrlAsync(m.FilePath, ct));
-
             var primaryMedia = mediaList.FirstOrDefault(m => m.IsPrimary);
             responseDTO.CoverImage = primaryMedia != null ? _fileStorageService.GetSignedUrlAsync(primaryMedia.FilePath, ct) : null;
 
@@ -161,5 +159,105 @@ public class BlogService(
 
             throw;
         }
+    }
+
+    public async Task<ApiResponse<PaginationResult<BlogResponseDTO>>> GetAllAsync(GetBlogsRequestDTO requestDTO, CancellationToken ct = default)
+    {
+        var blogQuery = _context.Blogs
+            .AsNoTracking()
+            .Where(b => b.Status == "published");
+
+        if (requestDTO.AuthorId.HasValue)
+        {
+            blogQuery = blogQuery.Where(b => b.AuthorId == requestDTO.AuthorId.Value);
+        }
+
+        if (requestDTO.CategoryId.HasValue)
+        {
+            blogQuery = blogQuery.Where(b => b.BlogCategories.Any(bc => bc.CategoryId == requestDTO.CategoryId.Value));
+        }
+
+        if (!string.IsNullOrWhiteSpace(requestDTO.Search))
+        {
+            string search = requestDTO.Search.Trim();
+            blogQuery = blogQuery.Where(b =>
+                b.Title.Contains(search) ||
+                b.Slug.Contains(search) ||
+                (b.Summary != null && b.Summary.Contains(search)) ||
+                b.Content.Contains(search));
+        }
+
+        blogQuery = (requestDTO.SortBy?.Trim().ToLower(), requestDTO.SortOrder?.Trim().ToLower()) switch
+        {
+            ("title", "asc") => blogQuery.OrderBy(b => b.Title),
+            ("title", _) => blogQuery.OrderByDescending(b => b.Title),
+            ("viewcount", "asc") => blogQuery.OrderBy(b => b.ViewCount),
+            ("viewcount", _) => blogQuery.OrderByDescending(b => b.ViewCount),
+            ("publishedat", "asc") => blogQuery.OrderBy(b => b.PublishedAt),
+            ("publishedat", _) => blogQuery.OrderByDescending(b => b.PublishedAt),
+            ("readingtimeminutes", "asc") => blogQuery.OrderBy(b => b.ReadingTimeMinutes),
+            ("readingtimeminutes", _) => blogQuery.OrderByDescending(b => b.ReadingTimeMinutes),
+            ("createdat", "asc") => blogQuery.OrderBy(b => b.CreatedAt),
+            _ => blogQuery.OrderByDescending(b => b.CreatedAt),
+        };
+
+        int totalCount = await blogQuery.CountAsync(ct);
+
+        int skip = (requestDTO.PageNumber - 1) * requestDTO.PageSize;
+
+        var blogs = await blogQuery
+            .Include(b => b.Author)
+            .Include(b => b.BlogCategories.Where(bc => bc.Category.DeletedAt == null))
+                .ThenInclude(bc => bc.Category)
+            .Include(b => b.Media.Where(m => m.IsPrimary))
+            .Include(b => b.Comments.Where(c => c.DeletedAt == null))
+                .ThenInclude(c => c.User)
+            .Skip(skip)
+            .Take(requestDTO.PageSize)
+            .ToListAsync(ct);
+
+        var blogResponseDTOs = blogs.ConvertAll(b =>
+        {
+            var dto = b.Adapt<BlogResponseDTO>();
+            if (b.Author != null)
+            {
+                dto.AuthorName = $"{b.Author.FirstName} {b.Author.LastName}".Trim();
+                dto.AuthorAvatar = b.Author.GetUserProfileUrl(_appSettings);
+            }
+
+            var primaryMedia = b.Media.FirstOrDefault(m => m.IsPrimary) ?? b.Media.FirstOrDefault();
+            dto.CoverImage = primaryMedia != null ? _fileStorageService.GetSignedUrlAsync(primaryMedia.FilePath, ct) : null;
+
+            var validCategories = b.BlogCategories
+                .Where(bc => bc.Category != null && bc.Category.DeletedAt == null)
+                .Select(bc => bc.Category)
+                .ToList();
+
+            dto.Categories = validCategories.Adapt<List<CategoryResponseDTO>>();
+            dto.Categories.ForEach(c => c.Icon = _fileStorageService.GetSignedUrlAsync(c.Icon, ct));
+
+            var validComments = b.Comments
+                .Where(c => c.DeletedAt == null)
+                .OrderByDescending(c => c.CreatedAt)
+                .ToList();
+
+            dto.Comments = validComments.Adapt<List<CommentResponseDTO>>();
+            for (int i = 0; i < validComments.Count; i++)
+            {
+                var commentEntity = validComments[i];
+                if (commentEntity.User != null)
+                {
+                    dto.Comments[i].UserName = !string.IsNullOrWhiteSpace(commentEntity.User.UserName)
+                        ? commentEntity.User.UserName
+                        : $"{commentEntity.User.FirstName} {commentEntity.User.LastName}".Trim();
+                    dto.Comments[i].UserAvatar = commentEntity.User.GetUserProfileUrl(_appSettings);
+                }
+            }
+
+            return dto;
+        });
+
+        var paginationResult = new PaginationResult<BlogResponseDTO>(blogResponseDTOs, totalCount, requestDTO.PageNumber, requestDTO.PageSize);
+        return ApiResponse<PaginationResult<BlogResponseDTO>>.SuccessResponse(paginationResult, StatusCodes.Status200OK, "Blogs fetched successfully.");
     }
 }
