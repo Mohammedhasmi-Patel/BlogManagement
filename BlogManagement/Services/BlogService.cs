@@ -216,48 +216,73 @@ public class BlogService(
             .Take(requestDTO.PageSize)
             .ToListAsync(ct);
 
-        var blogResponseDTOs = blogs.ConvertAll(b =>
-        {
-            var dto = b.Adapt<BlogResponseDTO>();
-            if (b.Author != null)
-            {
-                dto.AuthorName = $"{b.Author.FirstName} {b.Author.LastName}".Trim();
-                dto.AuthorAvatar = b.Author.GetUserProfileUrl(_appSettings);
-            }
-
-            var primaryMedia = b.Media.FirstOrDefault(m => m.IsPrimary) ?? b.Media.FirstOrDefault();
-            dto.CoverImage = primaryMedia != null ? _fileStorageService.GetSignedUrlAsync(primaryMedia.FilePath, ct) : null;
-
-            var validCategories = b.BlogCategories
-                .Where(bc => bc.Category != null && bc.Category.DeletedAt == null)
-                .Select(bc => bc.Category)
-                .ToList();
-
-            dto.Categories = validCategories.Adapt<List<CategoryResponseDTO>>();
-            dto.Categories.ForEach(c => c.Icon = _fileStorageService.GetSignedUrlAsync(c.Icon, ct));
-
-            var validComments = b.Comments
-                .Where(c => c.DeletedAt == null)
-                .OrderByDescending(c => c.CreatedAt)
-                .ToList();
-
-            dto.Comments = validComments.Adapt<List<CommentResponseDTO>>();
-            for (int i = 0; i < validComments.Count; i++)
-            {
-                var commentEntity = validComments[i];
-                if (commentEntity.User != null)
-                {
-                    dto.Comments[i].UserName = !string.IsNullOrWhiteSpace(commentEntity.User.UserName)
-                        ? commentEntity.User.UserName
-                        : $"{commentEntity.User.FirstName} {commentEntity.User.LastName}".Trim();
-                    dto.Comments[i].UserAvatar = commentEntity.User.GetUserProfileUrl(_appSettings);
-                }
-            }
-
-            return dto;
-        });
+        var blogResponseDTOs = blogs.ConvertAll(b => MapToBlogResponseDTO(b, ct));
 
         var paginationResult = new PaginationResult<BlogResponseDTO>(blogResponseDTOs, totalCount, requestDTO.PageNumber, requestDTO.PageSize);
         return ApiResponse<PaginationResult<BlogResponseDTO>>.SuccessResponse(paginationResult, StatusCodes.Status200OK, "Blogs fetched successfully.");
+    }
+
+    public async Task<ApiResponse<BlogResponseDTO>> GetBySlugAsync(string slug, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(slug))
+        {
+            throw new BadRequestException("Slug is required.");
+        }
+
+        var blog = await _context.Blogs
+            .AsNoTracking()
+            .Include(b => b.Author)
+            .Include(b => b.BlogCategories.Where(bc => bc.Category.DeletedAt == null))
+                .ThenInclude(bc => bc.Category)
+            .Include(b => b.Media.Where(m => m.IsPrimary))
+            .Include(b => b.Comments.Where(c => c.DeletedAt == null))
+                .ThenInclude(c => c.User)
+            .FirstOrDefaultAsync(b => b.Slug == slug.Trim().ToLower() && b.Status == "published", ct)
+            ?? throw new NotFoundException("Blog not found.");
+
+        var responseDTO = MapToBlogResponseDTO(blog, ct);
+
+        return ApiResponse<BlogResponseDTO>.SuccessResponse(responseDTO, StatusCodes.Status200OK, "Blog fetched successfully.");
+    }
+
+    private BlogResponseDTO MapToBlogResponseDTO(Blog blog, CancellationToken ct)
+    {
+        var dto = blog.Adapt<BlogResponseDTO>();
+        if (blog.Author != null)
+        {
+            dto.AuthorName = $"{blog.Author.FirstName} {blog.Author.LastName}".Trim();
+            dto.AuthorAvatar = blog.Author.GetUserProfileUrl(_appSettings);
+        }
+
+        var primaryMedia = blog.Media.FirstOrDefault(m => m.IsPrimary) ?? blog.Media.FirstOrDefault();
+        dto.CoverImage = primaryMedia != null ? _fileStorageService.GetSignedUrlAsync(primaryMedia.FilePath, ct) : null;
+
+        var validCategories = blog.BlogCategories
+            .Where(bc => bc.Category != null && bc.Category.DeletedAt == null)
+            .Select(bc => bc.Category)
+            .ToList();
+
+        dto.Categories = validCategories.Adapt<List<CategoryResponseDTO>>();
+        dto.Categories.ForEach(c => c.Icon = _fileStorageService.GetSignedUrlAsync(c.Icon, ct));
+
+        var validComments = blog.Comments
+            .Where(c => c.DeletedAt == null)
+            .OrderByDescending(c => c.CreatedAt)
+            .ToList();
+
+        dto.Comments = validComments.Adapt<List<CommentResponseDTO>>();
+        for (int i = 0; i < validComments.Count; i++)
+        {
+            var commentEntity = validComments[i];
+            if (commentEntity.User != null)
+            {
+                dto.Comments[i].UserName = !string.IsNullOrWhiteSpace(commentEntity.User.UserName)
+                    ? commentEntity.User.UserName
+                    : $"{commentEntity.User.FirstName} {commentEntity.User.LastName}".Trim();
+                dto.Comments[i].UserAvatar = commentEntity.User.GetUserProfileUrl(_appSettings);
+            }
+        }
+
+        return dto;
     }
 }

@@ -20,4 +20,14 @@ public class UserBlogController(IBlogService blogService) : BaseController
         var response = await _blogService.GetAllAsync(requestDTO, ct);
         return StatusCode(response.StatusCode, response);
     }
+
+    [HttpGet("{slug}")]
+    [ProducesResponseType(typeof(ApiResponse<BlogResponseDTO>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetBySlugAsync([FromRoute] string slug, CancellationToken ct)
+    {
+        var response = await _blogService.GetBySlugAsync(slug, ct);
+        return StatusCode(response.StatusCode, response);
+    }
 }

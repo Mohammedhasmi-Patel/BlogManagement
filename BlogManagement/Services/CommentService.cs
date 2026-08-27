@@ -2,20 +2,23 @@ using BlogManagement.Database;
 using BlogManagement.DTO.Comment;
 using BlogManagement.DTO.Common;
 using BlogManagement.Exceptions;
+using BlogManagement.Extension;
 using BlogManagement.Models;
 using BlogManagement.ServiceContracts;
+using Mapster;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlogManagement.Services;
 
-public class CommentService(AppDbContext context, UserManager<AppUser> userManager) : ICommentService
+public class CommentService(AppDbContext context, UserManager<AppUser> userManager, IFileStorageService fileService) : ICommentService
 {
     private readonly AppDbContext _context = context;
     private readonly UserManager<AppUser> _userManager = userManager;
+    private readonly IFileStorageService _fileService = fileService;
 
 
-    public async Task<ApiResponse<object>> CreateCommentAsync(CreateCommentRequestDTO requestDTO, string userEmail, CancellationToken ct = default)
+    public async Task<ApiResponse<CommentResponseDTO>> CreateCommentAsync(CreateCommentRequestDTO requestDTO, string userEmail, CancellationToken ct = default)
     {
         await using var transaction = await _context.Database.BeginTransactionAsync(ct);
         try
@@ -39,7 +42,11 @@ public class CommentService(AppDbContext context, UserManager<AppUser> userManag
             await _context.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
 
-            return ApiResponse<object>.SuccessResponse(null, StatusCodes.Status201Created, "Comment created successfully!");
+            var commentResponseDTO = comment.Adapt<CommentResponseDTO>();
+            commentResponseDTO.UserName = user.UserName;
+            commentResponseDTO.UserAvatar = string.IsNullOrEmpty(user.Avatar) ? null : _fileService.GetSignedUrlAsync(user.Avatar);
+
+            return ApiResponse<CommentResponseDTO>.SuccessResponse(commentResponseDTO, StatusCodes.Status201Created, "Comment created successfully!");
         }
         catch (Exception)
         {
@@ -48,7 +55,7 @@ public class CommentService(AppDbContext context, UserManager<AppUser> userManag
         }
     }
 
-    public async Task<ApiResponse<object>> UpdateCommentAsync(Guid commentId, UpdateCommentRequestDTO requestDTO, string userEmail, CancellationToken ct = default)
+    public async Task<ApiResponse<CommentResponseDTO>> UpdateCommentAsync(Guid commentId, UpdateCommentRequestDTO requestDTO, string userEmail, CancellationToken ct = default)
     {
         await using var transaction = await _context.Database.BeginTransactionAsync(ct);
         try
@@ -65,8 +72,11 @@ public class CommentService(AppDbContext context, UserManager<AppUser> userManag
 
             await _context.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
+            var commentResponseDTO = comment.Adapt<CommentResponseDTO>();
+            commentResponseDTO.UserName = user.UserName;
+            commentResponseDTO.UserAvatar = string.IsNullOrEmpty(user.Avatar) ? null : _fileService.GetSignedUrlAsync(user.Avatar);
 
-            return ApiResponse<object>.SuccessResponse(null, StatusCodes.Status200OK, "Comment updated successfully!");
+            return ApiResponse<CommentResponseDTO>.SuccessResponse(commentResponseDTO, StatusCodes.Status200OK, "Comment updated successfully!");
         }
         catch (Exception)
         {
@@ -86,7 +96,7 @@ public class CommentService(AppDbContext context, UserManager<AppUser> userManag
             {
                 throw new ForbiddenException("You are not authorized to delete this comment!");
             }
-            _context.Comments.Remove(comment);
+            comment.DeletedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
             return ApiResponse<object>.SuccessResponse(null, StatusCodes.Status200OK, "Comment deleted successfully!");
