@@ -16,10 +16,11 @@ public class BlogResponseDTO
     public int ReadingTimeMinutes { get; set; }
     public Guid AuthorId { get; set; }
     public string? AuthorName { get; set; }
+    public int? LikeCount { get; set; } = 0;
+    public bool IsLiked { get; set; } = false;
     public string? AuthorAvatar { get; set; }
     public string? CoverImage { get; set; }
     public DateTime? PublishedAt { get; set; }
-
     public DateTime CreatedAt { get; set; }
     public List<CategoryResponseDTO> Categories { get; set; } = new();
     public List<CommentResponseDTO> Comments { get; set; } = new();

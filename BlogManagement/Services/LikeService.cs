@@ -14,7 +14,7 @@ public class LikeService(UserManager<AppUser> userManager, AppDbContext context)
     private readonly UserManager<AppUser> _userManager = userManager;
     private readonly AppDbContext _context = context;
 
-    public async Task<ApiResponse<object>> CreateLikeAsync(CreateLikeRequestDTO requestDTO, string userEmail, CancellationToken ct = default)
+    public async Task<ApiResponse<LikeResponseDTO>> CreateLikeAsync(CreateLikeRequestDTO requestDTO, string userEmail, CancellationToken ct = default)
     {
         await using var transaction = await _context.Database.BeginTransactionAsync(ct);
         try
@@ -43,16 +43,25 @@ public class LikeService(UserManager<AppUser> userManager, AppDbContext context)
             await _context.Likes.AddAsync(like, ct);
             await _context.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
-            return ApiResponse<object>.SuccessResponse(null, StatusCodes.Status201Created, "Like created successfully!");
+            int likeCount = await _context.Likes.CountAsync(l => l.BlogId == requestDTO.BlogId, ct);
+            LikeResponseDTO likeResponseDTO = new LikeResponseDTO()
+            {
+                BlogId = requestDTO.BlogId,
+                IsLiked = true,
+                LikeCount = likeCount,
+                LikeId = like.Id
+            };
+            return ApiResponse<LikeResponseDTO>.SuccessResponse(likeResponseDTO, StatusCodes.Status201Created, "Like created successfully!");
         }
         catch (Exception ex)
         {
+
             await transaction.RollbackAsync(ct);
-            throw new InternalServerException("Something went wrong.");
+            throw;
         }
     }
 
-    public async Task<ApiResponse<object>> RemoveLikeAsync(Guid blogId, string userEmail, CancellationToken ct = default)
+    public async Task<ApiResponse<LikeResponseDTO>> RemoveLikeAsync(Guid blogId, string userEmail, CancellationToken ct = default)
     {
         await using var transaction = await _context.Database.BeginTransactionAsync(ct);
         var user = await _userManager.Users.Where(u => u.Email == userEmail && u.DeletedAt == null).FirstOrDefaultAsync(ct) ?? throw new NotFoundException("User not found!");
@@ -61,7 +70,15 @@ public class LikeService(UserManager<AppUser> userManager, AppDbContext context)
 
         _context.Likes.Remove(like);
         await _context.SaveChangesAsync(ct);
-        return ApiResponse<object>.SuccessResponse(null, StatusCodes.Status200OK, "Like removed successfully!");
+        await transaction.CommitAsync(ct);
+        LikeResponseDTO likeResponseDTO = new LikeResponseDTO()
+        {
+            BlogId = blogId,
+            IsLiked = false,
+            LikeCount = await _context.Likes.CountAsync(l => l.BlogId == blogId, ct),
+            LikeId = null
+        };
+        return ApiResponse<LikeResponseDTO>.SuccessResponse(likeResponseDTO, StatusCodes.Status200OK, "Like removed successfully!");
     }
 }
 

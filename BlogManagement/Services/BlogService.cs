@@ -161,8 +161,18 @@ public class BlogService(
         }
     }
 
-    public async Task<ApiResponse<PaginationResult<BlogResponseDTO>>> GetAllAsync(GetBlogsRequestDTO requestDTO, CancellationToken ct = default)
+    public async Task<ApiResponse<PaginationResult<BlogResponseDTO>>> GetAllAsync(GetBlogsRequestDTO requestDTO, string? userEmail = null, CancellationToken ct = default)
     {
+        Guid? currentUserId = null;
+        if (!string.IsNullOrWhiteSpace(userEmail))
+        {
+            var currentUser = await _userManager.FindByEmailAsync(userEmail);
+            if (currentUser != null)
+            {
+                currentUserId = currentUser.Id;
+            }
+        }
+
         var blogQuery = _context.Blogs
             .AsNoTracking()
             .Where(b => b.Status == "published");
@@ -212,21 +222,32 @@ public class BlogService(
             .Include(b => b.Media.Where(m => m.IsPrimary))
             .Include(b => b.Comments.Where(c => c.DeletedAt == null))
                 .ThenInclude(c => c.User)
+            .Include(b => b.Likes)
             .Skip(skip)
             .Take(requestDTO.PageSize)
             .ToListAsync(ct);
 
-        var blogResponseDTOs = blogs.ConvertAll(b => MapToBlogResponseDTO(b, ct));
+        var blogResponseDTOs = blogs.ConvertAll(b => MapToBlogResponseDTO(b, currentUserId, ct));
 
         var paginationResult = new PaginationResult<BlogResponseDTO>(blogResponseDTOs, totalCount, requestDTO.PageNumber, requestDTO.PageSize);
         return ApiResponse<PaginationResult<BlogResponseDTO>>.SuccessResponse(paginationResult, StatusCodes.Status200OK, "Blogs fetched successfully.");
     }
 
-    public async Task<ApiResponse<BlogResponseDTO>> GetBySlugAsync(string slug, CancellationToken ct = default)
+    public async Task<ApiResponse<BlogResponseDTO>> GetBySlugAsync(string slug, string? userEmail = null, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(slug))
         {
             throw new BadRequestException("Slug is required.");
+        }
+
+        Guid? currentUserId = null;
+        if (!string.IsNullOrWhiteSpace(userEmail))
+        {
+            var currentUser = await _userManager.FindByEmailAsync(userEmail);
+            if (currentUser != null)
+            {
+                currentUserId = currentUser.Id;
+            }
         }
 
         var blog = await _context.Blogs
@@ -237,17 +258,22 @@ public class BlogService(
             .Include(b => b.Media.Where(m => m.IsPrimary))
             .Include(b => b.Comments.Where(c => c.DeletedAt == null))
                 .ThenInclude(c => c.User)
+            .Include(b => b.Likes)
             .FirstOrDefaultAsync(b => b.Slug == slug.Trim().ToLower() && b.Status == "published", ct)
             ?? throw new NotFoundException("Blog not found.");
 
-        var responseDTO = MapToBlogResponseDTO(blog, ct);
+        var responseDTO = MapToBlogResponseDTO(blog, currentUserId, ct);
 
         return ApiResponse<BlogResponseDTO>.SuccessResponse(responseDTO, StatusCodes.Status200OK, "Blog fetched successfully.");
     }
 
-    private BlogResponseDTO MapToBlogResponseDTO(Blog blog, CancellationToken ct)
+    private BlogResponseDTO MapToBlogResponseDTO(Blog blog, Guid? currentUserId, CancellationToken ct)
     {
         var dto = blog.Adapt<BlogResponseDTO>();
+
+        dto.LikeCount = blog.Likes?.Count ?? 0;
+        dto.IsLiked = currentUserId.HasValue && blog.Likes != null && blog.Likes.Any(l => l.UserId == currentUserId.Value);
+
         if (blog.Author != null)
         {
             dto.AuthorName = $"{blog.Author.FirstName} {blog.Author.LastName}".Trim();
