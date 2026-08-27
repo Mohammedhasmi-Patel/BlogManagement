@@ -53,9 +53,8 @@ public class LikeService(UserManager<AppUser> userManager, AppDbContext context)
             };
             return ApiResponse<LikeResponseDTO>.SuccessResponse(likeResponseDTO, StatusCodes.Status201Created, "Like created successfully!");
         }
-        catch (Exception ex)
+        catch
         {
-
             await transaction.RollbackAsync(ct);
             throw;
         }

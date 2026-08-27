@@ -173,6 +173,7 @@ public static class ConfigureProjectServices
         services.AddScoped<ICommentService, CommentService>();
         services.AddScoped<IUserFollowService, UserFollowService>();
         services.AddScoped<IDropDownService, DropDownService>();
+        services.AddScoped<IAuthorService, AuthorService>();
 
         return services;
     }

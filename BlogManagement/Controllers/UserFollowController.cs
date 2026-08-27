@@ -10,13 +10,14 @@ namespace BlogManagement.Controllers;
 
 [Route("api/follows")]
 [Authorize]
+[Produces("application/json")]
 public class UserFollowController(IUserFollowService userFollowService) : BaseController
 {
     private readonly IUserFollowService _userFollowService = userFollowService;
 
     [HttpPost]
     [Consumes("application/json")]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ApiResponse<FollowAuthorResponseDTO>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -25,17 +26,18 @@ public class UserFollowController(IUserFollowService userFollowService) : BaseCo
     {
         string userEmail = User.FindFirstValue(ClaimTypes.Email) ?? throw new UnauthorizedException("Unauthorized Access!");
         var response = await _userFollowService.FollowUserAsync(requestDTO, userEmail, ct);
-        return StatusCode(StatusCodes.Status201Created, response);
+        return StatusCode(response.StatusCode, response);
     }
 
     [HttpDelete("{authorId:guid}")]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<FollowAuthorResponseDTO>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UnfollowUser([FromRoute] Guid authorId, CancellationToken ct)
     {
         string userEmail = User.FindFirstValue(ClaimTypes.Email) ?? throw new UnauthorizedException("Unauthorized Access!");
         var response = await _userFollowService.UnfollowUserAsync(authorId, userEmail, ct);
-        return Ok(response);
+        return StatusCode(response.StatusCode, response);
     }
 }
+

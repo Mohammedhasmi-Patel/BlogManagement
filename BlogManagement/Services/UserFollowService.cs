@@ -15,12 +15,12 @@ public class UserFollowService(UserManager<AppUser> userManager, AppDbContext co
     private readonly UserManager<AppUser> _userManager = userManager;
     private readonly AppDbContext _context = context;
 
-    public async Task<ApiResponse<object>> FollowUserAsync(CreateUserFollowRequestDTO requestDTO, string userEmail, CancellationToken ct)
+    public async Task<ApiResponse<FollowAuthorResponseDTO>> FollowUserAsync(CreateUserFollowRequestDTO requestDTO, string userEmail, CancellationToken ct)
     {
         var user = await _userManager.Users
             .AsNoTracking()
-            .Where(u => u.Email == userEmail && u.DeletedAt == null)
-            .FirstOrDefaultAsync(ct) ?? throw new NotFoundException("User not found.");
+            .FirstOrDefaultAsync(u => u.Email == userEmail && u.DeletedAt == null, ct)
+            ?? throw new NotFoundException("User not found.");
 
         if (user.Id == requestDTO.AuthorId)
         {
@@ -29,8 +29,8 @@ public class UserFollowService(UserManager<AppUser> userManager, AppDbContext co
 
         var author = await _userManager.Users
             .AsNoTracking()
-            .Where(u => u.Id == requestDTO.AuthorId && u.DeletedAt == null)
-            .FirstOrDefaultAsync(ct) ?? throw new NotFoundException("Author not found.");
+            .FirstOrDefaultAsync(u => u.Id == requestDTO.AuthorId && u.DeletedAt == null, ct)
+            ?? throw new NotFoundException("Author not found.");
 
         var isAuthor = await _userManager.IsInRoleAsync(author, nameof(UserRoleEnum.Author));
         if (!isAuthor)
@@ -55,15 +55,26 @@ public class UserFollowService(UserManager<AppUser> userManager, AppDbContext co
         await _context.UserFollows.AddAsync(userFollow, ct);
         await _context.SaveChangesAsync(ct);
 
-        return ApiResponse<object>.SuccessResponse(null, StatusCodes.Status201Created, "User followed successfully.");
+        int totalFollowers = await _context.UserFollows
+            .AsNoTracking()
+            .CountAsync(x => x.AuthorId == author.Id, ct);
+
+        var responseDTO = new FollowAuthorResponseDTO
+        {
+            AuthorId = author.Id.ToString(),
+            IsFollowing = true,
+            TotalFollowers = totalFollowers
+        };
+
+        return ApiResponse<FollowAuthorResponseDTO>.SuccessResponse(responseDTO, StatusCodes.Status201Created, "User followed successfully.");
     }
 
-    public async Task<ApiResponse<object>> UnfollowUserAsync(Guid authorId, string userEmail, CancellationToken ct)
+    public async Task<ApiResponse<FollowAuthorResponseDTO>> UnfollowUserAsync(Guid authorId, string userEmail, CancellationToken ct)
     {
         var user = await _userManager.Users
             .AsNoTracking()
-            .Where(u => u.Email == userEmail && u.DeletedAt == null)
-            .FirstOrDefaultAsync(ct) ?? throw new NotFoundException("User not found.");
+            .FirstOrDefaultAsync(u => u.Email == userEmail && u.DeletedAt == null, ct)
+            ?? throw new NotFoundException("User not found.");
 
         var userFollow = await _context.UserFollows
             .FirstOrDefaultAsync(x => x.FollowerId == user.Id && x.AuthorId == authorId, ct)
@@ -72,6 +83,18 @@ public class UserFollowService(UserManager<AppUser> userManager, AppDbContext co
         _context.UserFollows.Remove(userFollow);
         await _context.SaveChangesAsync(ct);
 
-        return ApiResponse<object>.SuccessResponse(null, StatusCodes.Status200OK, "User unfollowed successfully.");
+        int totalFollowers = await _context.UserFollows
+            .AsNoTracking()
+            .CountAsync(x => x.AuthorId == authorId, ct);
+
+        var responseDTO = new FollowAuthorResponseDTO
+        {
+            AuthorId = authorId.ToString(),
+            IsFollowing = false,
+            TotalFollowers = totalFollowers
+        };
+
+        return ApiResponse<FollowAuthorResponseDTO>.SuccessResponse(responseDTO, StatusCodes.Status200OK, "User unfollowed successfully.");
     }
 }
+

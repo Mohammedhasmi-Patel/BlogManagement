@@ -19,7 +19,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
     {
         base.OnModelCreating(builder);
 
-        // BlogHasCategory composite key and relations
         builder.Entity<BlogHasCategory>(entity =>
         {
             entity.HasKey(bc => new { bc.BlogId, bc.CategoryId });
@@ -33,7 +32,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
                 .HasForeignKey(bc => bc.CategoryId);
         });
 
-        // Bookmark composite key and relations
         builder.Entity<Bookmark>(entity =>
         {
             entity.HasKey(bm => new { bm.UserId, bm.BlogId });
@@ -48,7 +46,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
                 .HasForeignKey(bm => bm.BlogId);
         });
 
-        // UserFollow composite key and relations
         builder.Entity<UserFollow>(entity =>
         {
             entity.HasKey(uf => new { uf.FollowerId, uf.AuthorId });
@@ -64,7 +61,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        // Blog relations
         builder.Entity<Blog>(entity =>
         {
             entity.HasOne(b => b.Author)
@@ -73,7 +69,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        // Category relations
         builder.Entity<Category>(entity =>
         {
             entity.HasOne(c => c.Creator)
@@ -82,7 +77,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        // Comment relations
         builder.Entity<Comment>(entity =>
         {
             entity.HasOne(c => c.Blog)
@@ -95,7 +89,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        // Like relations
         builder.Entity<Like>(entity =>
         {
             entity.HasOne(l => l.Blog)
@@ -108,7 +101,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        // BlogHasMedia relations
         builder.Entity<BlogHasMedia>(entity =>
         {
             entity.HasKey(m => m.Id);
