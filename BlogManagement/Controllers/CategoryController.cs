@@ -65,4 +65,17 @@ public class CategoryController(ICategoryService categoryService) : BaseControll
         var response = await _categoryService.UpdateAsync(requestDTO, userEmail, ct);
         return StatusCode(response.StatusCode, response);
     }
+
+    [HttpDelete("{id:guid}")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> DeleteAsync([FromRoute] Guid id, CancellationToken ct)
+    {
+        var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? throw new UnauthorizedException("Unauthorized user.");
+        var response = await _categoryService.DeleteAsync(id, userEmail, ct);
+        return StatusCode(response.StatusCode, response);
+    }
 }

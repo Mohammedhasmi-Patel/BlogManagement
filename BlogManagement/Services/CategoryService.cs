@@ -19,11 +19,11 @@ public class CategoryService(AppDbContext context, UserManager<AppUser> userMana
 
     public async Task<ApiResponse<CategoryResponseDTO>> CreateAsync(CreateCategoryRequestDTO requestDTO, string email, CancellationToken ct)
     {
-        AppUser? appUser = await _userManager.FindByEmailAsync(email) 
+        AppUser? appUser = await _userManager.FindByEmailAsync(email)
             ?? throw new UnauthorizedException("Unauthorized user.");
 
         var categoryNameExists = await _context.Categories.AnyAsync(
-            c => c.CreatedBy == appUser.Id && c.DeletedAt == null && c.Name.ToLower() == requestDTO.Name.Trim().ToLower(), 
+            c => c.CreatedBy == appUser.Id && c.DeletedAt == null && c.Name.ToLower() == requestDTO.Name.Trim().ToLower(),
             ct);
 
         if (categoryNameExists)
@@ -69,9 +69,32 @@ public class CategoryService(AppDbContext context, UserManager<AppUser> userMana
         }
     }
 
+    public async Task<ApiResponse<object>> DeleteAsync(Guid id, string userEmail, CancellationToken ct)
+    {
+        AppUser? appUser = await _userManager.FindByEmailAsync(userEmail) 
+            ?? throw new UnauthorizedException("Unauthorized user.");
+
+        Category? category = await _context.Categories
+            .FirstOrDefaultAsync(c => c.Id == id && c.DeletedAt == null && c.CreatedBy == appUser.Id, ct)
+            ?? throw new NotFoundException("Category not found.");
+
+        var hasPosts = await _context.BlogCategories
+            .AnyAsync(p => p.CategoryId == id , ct);
+
+        if (hasPosts)
+        {
+            throw new ConflictException("Category cannot be deleted as it is associated with blog posts.");
+        }
+
+        category.DeletedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync(ct);
+        return ApiResponse<object>.SuccessResponse(null, 200, "Category deleted successfully.");
+    }
+
+
     public async Task<ApiResponse<PaginationResult<CategoryResponseDTO>>> GetAllAsync(GetCategoriesRequestDTO requestDTO, string email, CancellationToken ct)
     {
-        AppUser? appUser = await _userManager.FindByEmailAsync(email) 
+        AppUser? appUser = await _userManager.FindByEmailAsync(email)
             ?? throw new UnauthorizedException("Unauthorized user.");
 
         var categoryQuery = _context.Categories
@@ -124,12 +147,12 @@ public class CategoryService(AppDbContext context, UserManager<AppUser> userMana
 
     public async Task<ApiResponse<CategoryResponseDTO>> GetByIdAsync(Guid id, string email, CancellationToken ct)
     {
-        AppUser? appUser = await _userManager.FindByEmailAsync(email) 
+        AppUser? appUser = await _userManager.FindByEmailAsync(email)
             ?? throw new UnauthorizedException("Unauthorized user.");
 
         Category category = await _context.Categories
             .AsNoTracking()
-            .FirstOrDefaultAsync(c => c.Id == id && c.CreatedBy == appUser.Id && c.DeletedAt == null, ct) 
+            .FirstOrDefaultAsync(c => c.Id == id && c.CreatedBy == appUser.Id && c.DeletedAt == null, ct)
             ?? throw new NotFoundException("Category not found.");
 
         var fileUrl = category.Icon != null ? _storageService.GetSignedUrlAsync(category.Icon, ct) : null;
@@ -141,18 +164,18 @@ public class CategoryService(AppDbContext context, UserManager<AppUser> userMana
 
     public async Task<ApiResponse<CategoryResponseDTO>> UpdateAsync(UpdateCategoryRequestDTO requestDTO, string email, CancellationToken ct)
     {
-        AppUser? appUser = await _userManager.FindByEmailAsync(email) 
+        AppUser? appUser = await _userManager.FindByEmailAsync(email)
             ?? throw new UnauthorizedException("Unauthorized user.");
 
         Category category = await _context.Categories
-            .FirstOrDefaultAsync(c => c.Id == requestDTO.Id && c.CreatedBy == appUser.Id && c.DeletedAt == null, ct) 
+            .FirstOrDefaultAsync(c => c.Id == requestDTO.Id && c.CreatedBy == appUser.Id && c.DeletedAt == null, ct)
             ?? throw new NotFoundException("Category not found.");
 
         bool existingCategory = await _context.Categories.AnyAsync(
-            c => c.CreatedBy == appUser.Id && 
-                 c.DeletedAt == null && 
-                 c.Id != requestDTO.Id && 
-                 c.Name.ToLower() == requestDTO.Name.Trim().ToLower(), 
+            c => c.CreatedBy == appUser.Id &&
+                 c.DeletedAt == null &&
+                 c.Id != requestDTO.Id &&
+                 c.Name.ToLower() == requestDTO.Name.Trim().ToLower(),
             ct);
 
         if (existingCategory)
@@ -171,9 +194,14 @@ public class CategoryService(AppDbContext context, UserManager<AppUser> userMana
             iconUpdated = true;
         }
 
-        category.Name = requestDTO.Name.Trim();
-        category.Slug = await category.GenerateUniqueSlug(_context, ct: ct);
+        if (!category.Name.Equals(requestDTO.Name.Trim()))
+        {
+            category.Name = requestDTO.Name.Trim();
+            category.Slug = await category.GenerateUniqueSlug(_context, ct: ct);
+        }
+
         category.Description = requestDTO.Description?.Trim();
+
         if (iconUpdated)
         {
             category.Icon = newIconUrl;
