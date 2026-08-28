@@ -9,4 +9,6 @@ public interface IBlogService
     Task<ApiResponse<BlogResponseDTO>> CreateAsync(CreateBlogRequestDTO requestDTO, string authorEmail, CancellationToken ct = default);
     Task<ApiResponse<PaginationResult<BlogResponseDTO>>> GetAllAsync(GetBlogsRequestDTO requestDTO, string? userEmail = null, CancellationToken ct = default);
     Task<ApiResponse<BlogResponseDTO>> GetBySlugAsync(string slug, string? userEmail = null, CancellationToken ct = default);
+    Task<ApiResponse<BlogResponseDTO>> UpdateAsync(UpdateBlogRequestDTO requestDTO, string authorEmail, CancellationToken ct = default);
+    Task<ApiResponse<object>> DeleteAsync(Guid id, string authorEmail, CancellationToken ct = default);
 }

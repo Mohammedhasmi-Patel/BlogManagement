@@ -267,6 +267,227 @@ public class BlogService(
         return ApiResponse<BlogResponseDTO>.SuccessResponse(responseDTO, StatusCodes.Status200OK, "Blog fetched successfully.");
     }
 
+    public async Task<ApiResponse<BlogResponseDTO>> UpdateAsync(UpdateBlogRequestDTO requestDTO, string authorEmail, CancellationToken ct = default)
+    {
+        var author = await _userManager.FindByEmailAsync(authorEmail)
+            ?? throw new UnauthorizedException("Unauthorized user.");
+
+        var blog = await _context.Blogs
+            .Include(b => b.BlogCategories)
+                .ThenInclude(bc => bc.Category)
+            .Include(b => b.Media)
+            .FirstOrDefaultAsync(b => b.Id == requestDTO.Id, ct)
+            ?? throw new NotFoundException("Blog not found.");
+
+        if (blog.AuthorId != author.Id)
+        {
+            throw new ForbiddenException("You do not have permission to update this blog.");
+        }
+
+        var isDuplicateTitle = await _context.Blogs.AnyAsync(
+            b => b.AuthorId == author.Id &&
+                 b.Id != blog.Id &&
+                 b.Title.ToLower() == requestDTO.Title.Trim().ToLower(),
+            ct);
+
+        if (isDuplicateTitle)
+        {
+            throw new ConflictException("You already have a blog with this title.");
+        }
+
+        List<Category> selectedCategories = [];
+        if (requestDTO.CategoryIds.Count > 0)
+        {
+            var distinctCategoryIds = requestDTO.CategoryIds.Distinct().ToList();
+            selectedCategories = await _context.Categories
+                .Where(c => distinctCategoryIds.Contains(c.Id) && c.DeletedAt == null)
+                .ToListAsync(ct);
+
+            if (selectedCategories.Count != distinctCategoryIds.Count)
+            {
+                throw new BadRequestException("One or more selected categories do not exist.");
+            }
+        }
+
+        if (!string.Equals(blog.Title.Trim(), requestDTO.Title.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            blog.Title = requestDTO.Title.Trim();
+            blog.Slug = await blog.GenerateUniqueSlug(_context, ct);
+        }
+
+        blog.Content = requestDTO.Content;
+        blog.ReadingTimeMinutes = BlogExtension.CalculateReadingTimeMinutes(requestDTO.Content);
+        blog.Summary = !string.IsNullOrWhiteSpace(requestDTO.Summary)
+            ? requestDTO.Summary.Trim()
+            : BlogExtension.GenerateSummaryFromContent(requestDTO.Content);
+        blog.SeoJson = requestDTO.SeoJson;
+
+        string newStatus = requestDTO.Status.Trim().ToLower();
+        if (newStatus == "published" && blog.PublishedAt == null)
+        {
+            blog.PublishedAt = DateTime.UtcNow;
+        }
+        blog.Status = newStatus;
+
+        string? oldCoverFilePath = null;
+        string? newlyUploadedCoverFilePath = null;
+
+        if (requestDTO.CoverImage != null)
+        {
+            var coverUpload = await _fileStorageService.UploadAsync(requestDTO.CoverImage, "blogs", isFileRequired: false, ct);
+            if (coverUpload != null)
+            {
+                newlyUploadedCoverFilePath = coverUpload.FilePath;
+
+                var existingPrimaryMedia = blog.Media.FirstOrDefault(m => m.IsPrimary);
+                if (existingPrimaryMedia != null)
+                {
+                    oldCoverFilePath = existingPrimaryMedia.FilePath;
+                    existingPrimaryMedia.FilePath = coverUpload.FilePath;
+                    existingPrimaryMedia.FileName = coverUpload.FileName;
+                    existingPrimaryMedia.MimeType = coverUpload.Extension;
+                    existingPrimaryMedia.FileSize = coverUpload.FileSize;
+                }
+                else
+                {
+                    var coverMedia = coverUpload.Adapt<BlogHasMedia>();
+                    coverMedia.BlogId = blog.Id;
+                    coverMedia.IsPrimary = true;
+                    coverMedia.DisplayOrder = 0;
+                    blog.Media.Add(coverMedia);
+                    await _context.BlogHasMedia.AddAsync(coverMedia, ct);
+                }
+            }
+        }
+
+        var contentImageUrls = BlogExtension.ExtractUploadedImageUrls(blog.Content);
+        var existingContentMediaPaths = blog.Media
+            .Where(m => !m.IsPrimary)
+            .Select(m => m.FilePath)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        int nextDisplayOrder = blog.Media.Count > 0 ? blog.Media.Max(m => m.DisplayOrder) + 1 : 1;
+        foreach (var imgUrl in contentImageUrls)
+        {
+            if (!existingContentMediaPaths.Contains(imgUrl))
+            {
+                var contentMedia = new BlogHasMedia
+                {
+                    BlogId = blog.Id,
+                    FilePath = imgUrl,
+                    FileName = Path.GetFileName(imgUrl),
+                    MimeType = Path.GetExtension(imgUrl),
+                    IsPrimary = false,
+                    DisplayOrder = nextDisplayOrder++
+                };
+                blog.Media.Add(contentMedia);
+                await _context.BlogHasMedia.AddAsync(contentMedia, ct);
+            }
+        }
+
+        var distinctSelectedCategoryIds = requestDTO.CategoryIds.Distinct().ToHashSet();
+        var categoriesToRemove = blog.BlogCategories
+            .Where(bc => !distinctSelectedCategoryIds.Contains(bc.CategoryId))
+            .ToList();
+
+        foreach (var item in categoriesToRemove)
+        {
+            _context.BlogCategories.Remove(item);
+            blog.BlogCategories.Remove(item);
+        }
+
+        var existingCategoryIds = blog.BlogCategories.Select(bc => bc.CategoryId).ToHashSet();
+        foreach (var catId in distinctSelectedCategoryIds)
+        {
+            if (!existingCategoryIds.Contains(catId))
+            {
+                var newBlogCategory = new BlogHasCategory
+                {
+                    BlogId = blog.Id,
+                    CategoryId = catId
+                };
+                blog.BlogCategories.Add(newBlogCategory);
+                await _context.BlogCategories.AddAsync(newBlogCategory, ct);
+            }
+        }
+
+        await using var transaction = await _context.Database.BeginTransactionAsync(ct);
+        try
+        {
+            await _context.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+
+            if (!string.IsNullOrEmpty(oldCoverFilePath))
+            {
+                await _fileStorageService.DeleteAsync(oldCoverFilePath, ct);
+            }
+
+            var responseDTO = blog.Adapt<BlogResponseDTO>();
+            responseDTO.AuthorName = $"{author.FirstName} {author.LastName}".Trim();
+            responseDTO.AuthorAvatar = author.GetUserProfileUrl(_appSettings);
+
+            responseDTO.Categories = selectedCategories.Adapt<List<CategoryResponseDTO>>();
+            responseDTO.Categories.ForEach(c => c.Icon = _fileStorageService.GetSignedUrlAsync(c.Icon, ct));
+
+            var primaryMedia = blog.Media.FirstOrDefault(m => m.IsPrimary);
+            responseDTO.CoverImage = primaryMedia != null ? _fileStorageService.GetSignedUrlAsync(primaryMedia.FilePath, ct) : null;
+
+            return ApiResponse<BlogResponseDTO>.SuccessResponse(responseDTO, StatusCodes.Status200OK, "Blog updated successfully.");
+        }
+        catch
+        {
+            await transaction.RollbackAsync(ct);
+
+            if (!string.IsNullOrEmpty(newlyUploadedCoverFilePath))
+            {
+                await _fileStorageService.DeleteAsync(newlyUploadedCoverFilePath, ct);
+            }
+
+            throw;
+        }
+    }
+
+    public async Task<ApiResponse<object>> DeleteAsync(Guid id, string authorEmail, CancellationToken ct = default)
+    {
+        var author = await _userManager.FindByEmailAsync(authorEmail)
+            ?? throw new UnauthorizedException("Unauthorized user.");
+
+        var blog = await _context.Blogs
+            .Include(b => b.Media)
+            .FirstOrDefaultAsync(b => b.Id == id, ct)
+            ?? throw new NotFoundException("Blog not found.");
+
+        if (blog.AuthorId != author.Id)
+        {
+            throw new ForbiddenException("You do not have permission to delete this blog.");
+        }
+
+        var mediaFilePaths = blog.Media
+            .Select(m => m.FilePath)
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .ToList();
+
+        await using var transaction = await _context.Database.BeginTransactionAsync(ct);
+        try
+        {
+            _context.Blogs.Remove(blog);
+            await _context.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(ct);
+            throw;
+        }
+
+        foreach (var filePath in mediaFilePaths)
+        {
+            await _fileStorageService.DeleteAsync(filePath, ct);
+        }
+
+        return ApiResponse<object>.SuccessResponse(null, StatusCodes.Status200OK, "Blog deleted successfully.");
+    }
+
     private BlogResponseDTO MapToBlogResponseDTO(Blog blog, Guid? currentUserId, CancellationToken ct)
     {
         var dto = blog.Adapt<BlogResponseDTO>();
