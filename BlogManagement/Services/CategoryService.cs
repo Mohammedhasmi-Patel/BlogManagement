@@ -112,5 +112,58 @@ public class CategoryService(AppDbContext context, UserManager<AppUser> userMana
         var responseDTO = new PaginationResult<CategoryResponseDTO>(categoriesListingDTO, totalCount, requestDTO.PageNumber, requestDTO.PageSize);
         return ApiResponse<PaginationResult<CategoryResponseDTO>>.SuccessResponse(responseDTO, 200, "Categories list fetched successfully.");
     }
+
+    public async Task<ApiResponse<CategoryResponseDTO>> GetByIdAsync(Guid id, string email, CancellationToken ct)
+    {
+        AppUser? appUser = await _userManager.FindByEmailAsync(email) ?? throw new UnauthorizedAccessException("Unauthorized user.");
+
+        Category? category = await _context.Categories
+                                .FirstOrDefaultAsync(c => c.Id == id && c.CreatedBy == appUser.Id, ct) ?? throw new BadRequestException("Category not found");
+        var fileUrl = category.Icon != null ? _storageService.GetSignedUrlAsync(category.Icon, ct) : null;
+        var responseData = category.Adapt<CategoryResponseDTO>();
+        responseData.Icon = fileUrl;
+        return ApiResponse<CategoryResponseDTO>.SuccessResponse(responseData, 200, "Category fetched successfully.");
+
+    }
+
+
+    public async Task<ApiResponse<CategoryResponseDTO>> UpdateAsync(UpdateCategoryRequestDTO requestDTO, string email, CancellationToken ct)
+    {
+        await using var transaction = await _context.Database.BeginTransactionAsync(ct);
+
+        try
+        {
+            AppUser? appUser = await _userManager.FindByEmailAsync(email) ?? throw new UnauthorizedAccessException("Unauthorized user.");
+            string? fileUrl = null;
+
+            Category? category = await _context.Categories
+                                        .FirstOrDefaultAsync(c => c.Id == requestDTO.Id && c.CreatedBy == appUser.Id, ct) ?? throw new BadRequestException("Category not found");
+
+            if (requestDTO.Icon?.Length > 0)
+            {
+                if (category.Icon != null)
+                {
+                    await _storageService.DeleteAsync(category.Icon, ct);
+                }
+                var fileResponse = await _storageService.UploadAsync(requestDTO.Icon, "categories", true, ct);
+                fileUrl = fileResponse?.FileUrl;
+            }
+            bool existingCategory = await _context.Categories.AnyAsync(c => c.Name.ToLower() == requestDTO.Name.ToLower() && c.Id != requestDTO.Id, ct);
+            if (existingCategory) throw new BadRequestException("Category name already exists");
+            category.Name = requestDTO.Name;
+            category.Description = requestDTO.Description;
+            if (requestDTO.Icon != null) category.Icon = fileUrl;
+            await _context.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+            var responseData = category.Adapt<CategoryResponseDTO>();
+            return ApiResponse<CategoryResponseDTO>.SuccessResponse(responseData, 200, "Category updated successfully.");
+        }
+        catch
+        {
+            await transaction.RollbackAsync(ct);
+            throw;
+        }
+    }
+
 }
 
