@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using BlogManagement.DTO.Common;
 using BlogManagement.DTO.Dropdown;
 using BlogManagement.ServiceContracts;
@@ -22,7 +23,9 @@ public class DropDownController(IDropDownService dropDownService) : BaseControll
     [ProducesResponseType(typeof(ApiResponse<PaginationResult<CategoryDropDownResponseDTO>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetCategoryAsync([FromQuery] GetCategoryDropDownRequestDTO requestDTO, CancellationToken ct)
     {
-        var response = await _dropDownService.GetCategoryAsync(requestDTO, ct);
+        string userEmail = User.FindFirstValue(ClaimTypes.Email) ?? null;
+                          
+        var response = await _dropDownService.GetCategoryAsync(requestDTO,userEmail, ct);
         return StatusCode(response.StatusCode, response);
     }
 }

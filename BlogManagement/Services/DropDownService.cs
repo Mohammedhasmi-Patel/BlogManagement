@@ -2,16 +2,19 @@ using BlogManagement.Database;
 using BlogManagement.DTO.Common;
 using BlogManagement.DTO.Dropdown;
 using BlogManagement.Enum;
+using BlogManagement.Models;
 using BlogManagement.ServiceContracts;
 using Mapster;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlogManagement.Services;
 
-public class DropDownService(AppDbContext context, IFileStorageService fileService) : IDropDownService
+public class DropDownService(AppDbContext context, IFileStorageService fileService, UserManager<AppUser> userManager) : IDropDownService
 {
     private readonly AppDbContext _context = context;
     private readonly IFileStorageService _fileService = fileService;
+    private readonly UserManager<AppUser> _userManager = userManager;
 
     public async Task<ApiResponse<PaginationResult<AuthorDropdownResponseDTO>>> GetAuthorAsync(GetAuthorDropdownRequestDTO? requestDTO = null, CancellationToken ct = default)
     {
@@ -65,11 +68,17 @@ public class DropDownService(AppDbContext context, IFileStorageService fileServi
         );
     }
 
-    public async Task<ApiResponse<PaginationResult<CategoryDropDownResponseDTO>>> GetCategoryAsync(GetCategoryDropDownRequestDTO? requestDTO = null, CancellationToken ct = default)
+    public async Task<ApiResponse<PaginationResult<CategoryDropDownResponseDTO>>> GetCategoryAsync(GetCategoryDropDownRequestDTO? requestDTO = null, string? userEmail = null, CancellationToken ct = default)
     {
         requestDTO ??= new GetCategoryDropDownRequestDTO();
+        AppUser? appUser = null;
+        if (!string.IsNullOrWhiteSpace(userEmail))
+        {
+            appUser = await _userManager.FindByEmailAsync(userEmail);
+        }
 
-        var categoryQuery = _context.Categories.AsNoTracking();
+        var categoryQuery = _context.Categories.Where(c => c.DeletedAt == null).AsNoTracking();
+        
 
         if (!string.IsNullOrWhiteSpace(requestDTO.Search))
         {
@@ -82,6 +91,11 @@ public class DropDownService(AppDbContext context, IFileStorageService fileServi
         int totalCount = await categoryQuery.CountAsync(ct);
 
         int skip = (requestDTO.PageNumber - 1) * requestDTO.PageSize;
+
+        if(appUser != null)
+        {
+            categoryQuery = categoryQuery.Where(c => c.CreatedBy == appUser.Id);
+        }
 
         var categories = await categoryQuery
             .Skip(skip)
