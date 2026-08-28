@@ -39,6 +39,18 @@ public class CategoryController(ICategoryService categoryService) : BaseControll
         return StatusCode(response.StatusCode, response);
     }
 
+    [HttpGet("{id:guid}")]
+    [ProducesResponseType(typeof(ApiResponse<CategoryResponseDTO>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetByIdAsync([FromRoute] Guid id, CancellationToken ct)
+    {
+        var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? throw new UnauthorizedException("Unauthorized user.");
+        var response = await _categoryService.GetByIdAsync(id, userEmail, ct);
+        return StatusCode(response.StatusCode, response);
+    }
+
     [HttpPut("{id:guid}")]
     [Consumes("multipart/form-data")]
     [ProducesResponseType(typeof(ApiResponse<CategoryResponseDTO>), StatusCodes.Status200OK)]

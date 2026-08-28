@@ -7,9 +7,26 @@ public class UpdateCategoryRequestValidator : AbstractValidator<UpdateCategoryRe
 {
     public UpdateCategoryRequestValidator()
     {
-        RuleFor(x => x.Id).NotEmpty().WithMessage("Category id is required.");
-        RuleFor(x => x.Name).NotEmpty().WithMessage("Category name is required.");
-        RuleFor(x => x.Description).NotEmpty().WithMessage("Category description is required.");
+        RuleFor(x => x.Id)
+            .NotEmpty()
+            .WithMessage("Category id is required.");
+
+        RuleFor(x => x.Name)
+            .NotEmpty()
+            .WithMessage("Category name is required.")
+            .MinimumLength(3)
+            .WithMessage("Category name must be at least 3 characters long.")
+            .MaximumLength(55)
+            .WithMessage("Category name must not exceed 55 characters.");
+
+        When(x => !string.IsNullOrWhiteSpace(x.Description), () =>
+        {
+            RuleFor(x => x.Description)
+                .MinimumLength(10)
+                .WithMessage("Description must be at least 10 characters long.")
+                .MaximumLength(255)
+                .WithMessage("Description must not exceed 255 characters.");
+        });
 
         When(x => x.Icon != null, () =>
         {

@@ -22,8 +22,15 @@ public static class CategoryExtension
             baseSlug = "category";
         }
 
-        var existingSlugs = await context.Categories
-            .Where(c => c.Slug == baseSlug || c.Slug.StartsWith(baseSlug + "-"))
+        var existingSlugsQuery = context.Categories
+            .Where(c => (c.Slug == baseSlug || c.Slug.StartsWith(baseSlug + "-")) && c.DeletedAt == null);
+
+        if (category.Id != Guid.Empty)
+        {
+            existingSlugsQuery = existingSlugsQuery.Where(c => c.Id != category.Id);
+        }
+
+        var existingSlugs = await existingSlugsQuery
             .Select(c => c.Slug)
             .ToListAsync(ct);
 
