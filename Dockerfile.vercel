@@ -28,7 +28,7 @@ EXPOSE 8080
 ENV DOTNET_EnableWriteXorExecute=0
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
 ENV ASPNETCORE_ENVIRONMENT=Production
-ENV ASPNETCORE_HTTP_PORTS=8080
+ENV PORT=8080
 
 # Copy published artifacts from build stage
 COPY --from=build /app/publish .

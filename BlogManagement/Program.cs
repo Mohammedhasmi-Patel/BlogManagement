@@ -3,6 +3,10 @@ using BlogManagement.Seeders;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Dynamically bind to the PORT environment variable provided by Vercel
+var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+
 builder.Services.ConfigureProjectService(builder.Configuration);
 var app = builder.Build();
 app.UseStaticFiles();
