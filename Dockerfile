@@ -1,5 +1,5 @@
 # Stage 1: Build stage
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM --platform=linux/amd64 mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 # Copy project file and restore dependencies (caching layer)
@@ -14,15 +14,16 @@ WORKDIR "/src/BlogManagement"
 RUN dotnet publish "BlogManagement.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
 # Stage 2: Runtime stage
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+FROM --platform=linux/amd64 mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 
-# Expose standard ASP.NET Core container ports
+# Expose standard container port
 EXPOSE 8080
-EXPOSE 8081
 
-# Core ASP.NET Core Environment Configuration
-# Note: Sensitive secrets (DB connection, JWT Secret) are injected at runtime via Environment Variables in your hosting provider
+# Environment Configuration for Serverless / Vercel Fluid Compute
+# 1. Disable JIT W^X to prevent SIGSEGV (exit code 139) in microVM / hypervisor sandboxes
+ENV DOTNET_EnableWriteXorExecute=0
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
 ENV ASPNETCORE_ENVIRONMENT=Production
 ENV ASPNETCORE_HTTP_PORTS=8080
 
@@ -34,3 +35,4 @@ RUN mkdir -p /app/wwwroot/uploads
 
 # Run the ASP.NET Core API
 ENTRYPOINT ["dotnet", "BlogManagement.dll"]
+
