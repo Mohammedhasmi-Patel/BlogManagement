@@ -9,18 +9,22 @@ builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
 builder.Services.ConfigureProjectService(builder.Configuration);
 var app = builder.Build();
+
+app.UseCors("FrontendCors");
+
 app.UseStaticFiles();
 
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+    app.UseHttpsRedirection();
 }
 
+// 2. Global Exception Handler
 app.UseGlobalExceptionHandler();
 
-app.UseCors("FrontendCors");
-app.UseHttpsRedirection();
+// 3. Auth
 app.UseAuthentication();
 app.UseAuthorization();
 

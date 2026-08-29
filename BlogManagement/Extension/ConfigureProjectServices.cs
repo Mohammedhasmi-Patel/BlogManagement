@@ -43,34 +43,14 @@ public static class ConfigureProjectServices
 
     private static IServiceCollection AddAppCors(this IServiceCollection services, IConfiguration configuration)
     {
-        List<string> allowedOrigins = configuration.GetSection("AllowedOrigins").Get<List<string>>() ?? [];
-
         services.AddCors(options =>
         {
             options.AddPolicy("FrontendCors", policy =>
             {
-                policy.SetIsOriginAllowed(origin =>
-                {
-                    if (string.IsNullOrWhiteSpace(origin))
-                    {
-                        return false;
-                    }
-
-                    if (Uri.TryCreate(origin, UriKind.Absolute, out var uri))
-                    {
-                        if (uri.Host == "localhost" ||
-                            uri.Host == "127.0.0.1" ||
-                            uri.Host.EndsWith(".vercel.app", StringComparison.OrdinalIgnoreCase))
-                        {
-                            return true;
-                        }
-                    }
-
-                    return allowedOrigins.Any(o => o.TrimEnd('/').Equals(origin.TrimEnd('/'), StringComparison.OrdinalIgnoreCase));
-                })
-                .AllowAnyMethod()
-                .AllowAnyHeader()
-                .AllowCredentials();
+                policy.SetIsOriginAllowed(origin => true)
+                      .AllowAnyMethod()
+                      .AllowAnyHeader()
+                      .AllowCredentials();
             });
         });
 
