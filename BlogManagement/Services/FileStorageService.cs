@@ -37,7 +37,8 @@ public class FileStorageService(IWebHostEnvironment env, IOptions<FileUploadSett
             throw new BadRequestException($"File type must be {string.Join(",", allowedExtensions)}.");
         }
 
-        string uploadFolder = Path.Combine(_env.WebRootPath, "uploads", folder);
+        string webRoot = !string.IsNullOrWhiteSpace(_env.WebRootPath) ? _env.WebRootPath : Path.Combine(_env.ContentRootPath, "wwwroot");
+        string uploadFolder = Path.Combine(webRoot, "uploads", folder);
         string uniqueFilename = Guid.NewGuid().ToString() + Path.GetExtension(file.FileName);
 
         if (!Directory.Exists(uploadFolder))
@@ -74,7 +75,8 @@ public class FileStorageService(IWebHostEnvironment env, IOptions<FileUploadSett
             if (!Path.IsPathRooted(filePath) || filePath.StartsWith('/') || filePath.StartsWith('\\'))
             {
                 var relativePath = filePath.TrimStart('/', '\\').Replace('/', Path.DirectorySeparatorChar);
-                fullPath = Path.Combine(_env.WebRootPath, relativePath);
+                string webRoot = !string.IsNullOrWhiteSpace(_env.WebRootPath) ? _env.WebRootPath : Path.Combine(_env.ContentRootPath, "wwwroot");
+                fullPath = Path.Combine(webRoot, relativePath);
             }
 
             if (File.Exists(fullPath))

@@ -60,19 +60,19 @@ public static class ConfigureProjectServices
     {
         string databaseUrl = configuration.GetConnectionString("DefaultConnection")!;
 
-        services.AddDbContext<AppDbContext>(options => options.UseSqlServer(databaseUrl));
+        services.AddDbContext<AppDbContext>(options => options.UseNpgsql(databaseUrl));
 
-    services
-        .AddIdentity<AppUser, AppRole>(options =>
-        {
-            options.Password.RequiredLength = 8;
-            options.Password.RequireDigit = true;
-            options.Password.RequireLowercase = true;
-            options.Password.RequireUppercase = true;
-            options.Password.RequireNonAlphanumeric = true;
-        })
-        .AddEntityFrameworkStores<AppDbContext>()
-        .AddDefaultTokenProviders();
+        services
+            .AddIdentity<AppUser, AppRole>(options =>
+            {
+                options.Password.RequiredLength = 8;
+                options.Password.RequireDigit = true;
+                options.Password.RequireLowercase = true;
+                options.Password.RequireUppercase = true;
+                options.Password.RequireNonAlphanumeric = true;
+            })
+            .AddEntityFrameworkStores<AppDbContext>()
+            .AddDefaultTokenProviders();
         return services;
     }
 
