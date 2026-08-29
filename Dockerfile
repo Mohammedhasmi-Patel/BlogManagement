@@ -17,6 +17,9 @@ RUN dotnet publish "BlogManagement.csproj" -c Release -o /app/publish /p:UseAppH
 FROM --platform=linux/amd64 mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 
+# Install required Kerberos/GSSAPI and networking native libraries for Linux runtime
+RUN apt-get update && apt-get install -y --no-install-recommends libgssapi-krb5-2 ca-certificates && rm -rf /var/lib/apt/lists/*
+
 # Expose standard container port
 EXPOSE 8080
 
